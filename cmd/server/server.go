@@ -11,7 +11,7 @@ import (
 
 var Server = cli.Command{
 	Name:  "server",
-	Usage: "golang_framework http server",
+	Usage: "facebook-spider http server",
 	Flags: []cli.Flag{
 		cli.StringFlag{
 			Name:  "conf, c",
@@ -44,7 +44,7 @@ func GinEngine() *gin.Engine {
 	} else {
 		r = gin.Default()
 	}
-    r.Use(middleware.Access)
+	r.Use(middleware.Access)
 	//r.Use(middleware.Auth)
 	r.GET("/health")
 	V1(r)
@@ -56,6 +56,6 @@ func V1(r *gin.Engine) {
 	g := r.Group("/v1")
 	{
 		g.POST("/echo", v1.Echo)
-        g.GET("/spider", v1.Spider)
+		g.GET("/spider", v1.Spider)
 	}
 }

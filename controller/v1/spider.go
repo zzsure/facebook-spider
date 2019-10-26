@@ -1,15 +1,15 @@
 package v1
 
 import (
+	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/gocolly/colly"
-    "fmt"
 	"gitlab.azbit.cn/web/facebook-spider/controller/response"
 )
 
 func Spider(c *gin.Context) {
-    co := colly.NewCollector()
-    co.OnHTML("a[href]", func(e *colly.HTMLElement) {
+	co := colly.NewCollector()
+	co.OnHTML("a[href]", func(e *colly.HTMLElement) {
 		e.Request.Visit(e.Attr("href"))
 	})
 

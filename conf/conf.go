@@ -31,6 +31,11 @@ type ConfigTOML struct {
 		}
 	}
 
+	Spider struct {
+		CsvPath       string `required:"true" flagUsage:"需要抓取facebook公众号的地址文件"`
+		CrawlInterval int    `required:"true" default:"3600" flagUsage:"需要隔多长时间抓取一次"`
+	}
+
 	Log struct {
 		Type  string `default:"json" flagUsage:"日志格式，json|raw"`
 		Level int    `default:"5" flagUsage:"日志级别：0 CRITICAL, 1 ERROR, 2 WARNING, 3 NOTICE, 4 INFO, 5 DEBUG"`

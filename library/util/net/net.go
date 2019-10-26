@@ -62,4 +62,3 @@ func (l LAN) NetInfo() (string, string) {
 	}
 	panic("get net info fail")
 }
-
