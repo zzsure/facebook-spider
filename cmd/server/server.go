@@ -44,8 +44,8 @@ func GinEngine() *gin.Engine {
 	} else {
 		r = gin.Default()
 	}
-	r.Use(middleware.Access)
-	r.Use(middleware.Auth)
+    r.Use(middleware.Access)
+	//r.Use(middleware.Auth)
 	r.GET("/health")
 	V1(r)
 
