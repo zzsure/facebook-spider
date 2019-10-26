@@ -1,0 +1,22 @@
+[Server]
+Listen = ":80"
+Env = "Dev"
+MaxHttpRequestBody = 4
+
+
+[Auth]
+Secret = "U4LOTsSWEASOCXNl4lzyg0rOyGztm1so"
+[Auth.Account]
+    "gZmZHTdPhnnYX9PPJ0BXTl5BcxIj5hBv" = "830NOp3sbxGJQBzS9onXr0ud01mmm1Vr"
+
+[Database]
+HostPort = "tcp(127.0.0.1:3306)"
+UserPassword = "root:password"
+DB = "golang_framework"
+[Database.Conn]
+    MaxLifeTime = 600
+    MaxIdle = 10
+    MaxOpen = 80
+
+[Log]
+Type = "raw"

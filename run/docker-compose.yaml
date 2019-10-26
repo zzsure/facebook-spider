@@ -1,0 +1,16 @@
+version: "3.3"
+
+services:
+  facebook-spider-devel:
+    image: golang:latest
+    container_name: facebook-spider-devel-${USER}
+    network_mode: "host"
+    working_dir: /root/go/src/gitlab.azbit.cn/web/facebook-spider
+    volumes:
+      - "../:/root/go/src/gitlab.azbit.cn/web/facebook-spider"
+    environment:
+      - PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/root/go/bin
+    entrypoint:
+      - bash
+      - -c
+      - make ${TARGET:-dev} MAIN_PKG=${MAIN_PKG:-facebook-spider} ARG='${ARG}'

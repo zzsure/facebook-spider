@@ -1,0 +1,15 @@
+version: "3.3"
+services:
+  facebook-spider:
+    image: zzsure/facebook-spider:1.0.0
+    container_name: facebook-spider-${USER}
+    network_mode: "host"
+    working_dir: /root/deploy/facebook-spider
+    volumes:
+      - "/home/ubuntu/code/src/gitlab.azbit.cn/web/facebook-spider/deploy/config.toml:/root/deploy/facebook-spider/config.toml"
+    restart: always
+    entrypoint:
+      - /root/deploy/facebook-spider/facebook-spider
+      - server
+      - -c
+      - /root/deploy/facebook-spider/config.toml

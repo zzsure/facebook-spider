@@ -1,0 +1,28 @@
+#!/bin/bash
+set -eu
+err=0
+
+# developer: commit fixes
+# CI: fail build
+# smarter CI: send patch (pull request)
+
+if ! git diff --exit-code >/dev/null ; then
+  echo "$0: sorry, this script needs clean git tree, try git stash" >&2
+  exit 1
+fi
+
+echo "$0: go fmt"
+go fmt ./...
+git diff --exit-code || err=1
+
+echo "$0: go fix"
+go fix ./...
+git diff --exit-code || err=1
+
+echo "$0: go vet"
+go vet ./... || err=1
+
+echo "$0: lint"
+golangci-lint run || err=1
+
+exit $err

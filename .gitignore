@@ -1,0 +1,10 @@
+.idea
+.vscode/
+.DS_Store
+facebook-spider
+log/
+bin/
+data/
+run/log/
+run/facebook-spider
+build/facebook-spider
