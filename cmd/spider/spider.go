@@ -1,10 +1,12 @@
 package spider
 
 import (
+    "os"
 	"github.com/op/go-logging"
 	"github.com/urfave/cli"
 	"gitlab.azbit.cn/web/facebook-spider/conf"
 	"gitlab.azbit.cn/web/facebook-spider/library/log"
+    "github.com/gocarina/gocsv"
 )
 
 var Spider = cli.Command{
@@ -30,8 +32,8 @@ var logger = logging.MustGetLogger("cmd/spider")
 
 // csv file data format
 type FileData struct {
-	URL  string `json:"url"`  // official accounts url
-	Lang string `json:"lang"` // official accounts language
+	URL  string `csv:"url"`  // official accounts url
+	Lang string `csv:"language"` // official accounts language
 }
 
 func run(c *cli.Context) {
@@ -62,7 +64,16 @@ func startCrawlTask(fds []*FileData) {
 
 // read url and language information from csv file
 func readUrlsFromCsv(path string) ([]*FileData, error) {
-    return nil, nil
+    file, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE, os.ModePerm)
+    if err != nil {
+        return nil, err
+    }
+    defer file.Close()
+    fds := []*FileData{}
+    if err := gocsv.UnmarshalFile(file, &fds); err != nil {
+        return nil, err
+    }
+    return fds, nil
 }
 
 // crawl official accounts article data

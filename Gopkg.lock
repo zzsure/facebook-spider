@@ -74,6 +74,12 @@
   version = "v0.2.3"
 
 [[projects]]
+  branch = "master"
+  name = "github.com/gocarina/gocsv"
+  packages = ["."]
+  revision = "3ecffd272576e35d1fa005b601b0bc0a24a4d58d"
+
+[[projects]]
   name = "github.com/gocolly/colly"
   packages = [".","debug","storage"]
   revision = "ca2f07cb3c921eec1b4993f4ff6f00f593dc3af0"
@@ -208,6 +214,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "fba2ea1e296ec27d230aea992ba8722b65a421e9ac436d8e73aa7571d9b3cf9f"
+  inputs-digest = "94ddb512c5c382a6781489b8706834ddff71c11ac487979e7fb6c5f4b9ecd296"
   solver-name = "gps-cdcl"
   solver-version = 1
