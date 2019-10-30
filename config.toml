@@ -3,4 +3,5 @@ Type = "raw"
 
 [Spider]
 CsvPath = "./data/urls.csv"
+ArticleBaseDir = "./data/"
 CrawlInterval = 3600
