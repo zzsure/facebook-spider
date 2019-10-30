@@ -1,13 +1,16 @@
 package spider
 
 import (
-    "os"
+	"fmt"
+	"github.com/PuerkitoBio/goquery"
+	"github.com/gocarina/gocsv"
+	"github.com/gocolly/colly"
 	"github.com/op/go-logging"
 	"github.com/urfave/cli"
 	"gitlab.azbit.cn/web/facebook-spider/conf"
 	"gitlab.azbit.cn/web/facebook-spider/library/log"
-    "github.com/gocarina/gocsv"
-    "github.com/gocolly/colly"
+	"net/http"
+	"os"
 )
 
 var Spider = cli.Command{
@@ -56,7 +59,7 @@ func startCrawlTask(fds []*FileData) {
 	for _, fd := range fds {
         logger.Info("crawl url:", fd.URL, " begin")
 		//err := crawl(fd.URL, fd.Lang)
-		_, err := crawl("https://www.facebook.com/pg/Vogue/posts/?ref=page_internal", "en")
+		_, err := crawlByGoquery("https://www.facebook.com/pg/Vogue/posts/", "en")
 		if err != nil {
             logger.Error("crawl url:", fd.URL, " err:", err)
 		}
@@ -80,17 +83,46 @@ func readUrlsFromCsv(path string) ([]*FileData, error) {
     return fds, nil
 }
 
+func crawlByGoquery(url, lang string) (string, error) {
+	// Request the HTML page.
+	res, err := http.Get("http://metalsucks.net")
+	if err != nil {
+		logger.Error("http error:", err)
+	}
+	defer res.Body.Close()
+	if res.StatusCode != 200 {
+		logger.Error("status code error:", res.StatusCode, res.Status)
+	}
+
+	// Load the HTML document
+	doc, err := goquery.NewDocumentFromReader(res.Body)
+	if err != nil {
+		logger.Error("document reader error:", err)
+	}
+
+	var ret string
+	// Find the review items
+	doc.Find(".sidebar-reviews article .content-block").Each(func(i int, s *goquery.Selection) {
+		// For each item found, get the band and title
+		band := s.Find("a").Text()
+		title := s.Find("i").Text()
+		fmt.Printf("Review %d: %s - %s\n", i, band, title)
+		ret = title
+	})
+	return ret, nil
+}
+
 // crawl official accounts article data
-func crawl(url, lang string) (string, error) {
+func crawlByColly(url, lang string) (string, error) {
 	// use colly to crwal
     c := colly.NewCollector()
     c.UserAgent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/77.0.3865.120 Safari/537.36"
     c.OnRequest(func(r *colly.Request) {
-		r.Headers.Set("Host", "facebook.com")
+		//r.Headers.Set("Host", "facebook.com")
         r.Headers.Set("Connection", "keep-alive")
         r.Headers.Set("Accept", "*/*")
-        r.Headers.Set("Origin", "http://facebook.com")
-        r.Headers.Set("Referer", "page_internal")
+        //r.Headers.Set("Origin", "https://facebook.com")
+        //r.Headers.Set("Referer", "page_internal")
         r.Headers.Set("Accept-Encoding", "gzip, deflate, br")
         r.Headers.Set("Accept-Language", "en-US,en;q=0.9")
     })
