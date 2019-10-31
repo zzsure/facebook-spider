@@ -1,3 +1,8 @@
 package consts
 
-const REQUEST_ID_KEY = "request_id"
+// crawler
+const (
+	POST_FILE_PREFIX    = "posts-"
+	COMMENT_FILE_PREFIX = "comments-"
+	POST_URL_FORMAT     = "https://facebook.com/pg/%s/posts/"
+)
