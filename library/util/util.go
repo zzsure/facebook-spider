@@ -10,6 +10,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -84,9 +85,29 @@ func ReadStringFromFile(path string) (string, error) {
 
 // get current date string
 func GetCurrentDate() string {
-	loc, _ := time.LoadLocation("Asia/Shanghai")
+	loc, _ := time.LoadLocation(consts.TIME_ZONE)
 	t := time.Now().In(loc).Format("20060102")
 	return t
+}
+
+// get current year
+func GetCurrentYear() string {
+	loc, _ := time.LoadLocation(consts.TIME_ZONE)
+	return fmt.Sprintf("%v", time.Now().In(loc).Year())
+}
+
+// get current hour
+func GetCurrentHour() int {
+	loc, _ := time.LoadLocation(consts.TIME_ZONE)
+	return time.Now().In(loc).Hour()
+}
+
+// get interval date
+func GetYesterdayDate() string {
+	loc, _ := time.LoadLocation(consts.TIME_ZONE)
+	nTime := time.Now().In(loc)
+	yesTime := nTime.AddDate(0, 0, -1)
+	return yesTime.Format("20060102")
 }
 
 // check file is exist
@@ -113,14 +134,13 @@ func ReadUrlsFromCsv(path string) ([]*models.FileData, error) {
 }
 
 // get post file name
-func GetPostFileName() string {
-	// TODO：日期改成爬取的
-	return fmt.Sprintf("%s%s", consts.POST_FILE_PREFIX, GetCurrentDate())
+func GetPostFileName(d string) string {
+	return fmt.Sprintf("%s%s", consts.POST_FILE_PREFIX, d)
 }
 
-func GetCommentsFileName() string {
-	// TODO: 日期改成爬取的
-	return fmt.Sprintf("%s%s", consts.COMMENT_FILE_PREFIX, GetCurrentDate())
+// get comment file name
+func GetCommentsFileName(d string) string {
+	return fmt.Sprintf("%s%s", consts.COMMENT_FILE_PREFIX, d)
 }
 
 // get post dir
@@ -132,4 +152,34 @@ func GetPostsDir(dir, url string) (string, error) {
 	}
 	return path.Join(dir, name), nil
 	//return fmt.Sprintf("%s%s/%s%s", dir, url, util.GetCurrentDate(), "posts")
+}
+
+// get date by facebook cell time
+func GetDateByCellTime(cellTime string) string {
+	// 1 sec - 59 secs, 1 min - 59 mins, 1 hr - 23 hrs, Yesterday at 12:28 PM, October 29 at 11:33 PM
+	date := GetCurrentDate()
+
+	if strings.Contains(cellTime, "Yesterday") {
+		date = GetYesterdayDate()
+	} else if strings.Contains(cellTime, "at") {
+		loc, _ := time.LoadLocation(consts.TIME_ZONE)
+		tmp := GetCurrentYear() + " " + cellTime
+		t, err := time.ParseInLocation("2006 January 2 at 3:4 PM", tmp, loc)
+		if err == nil {
+			date = fmt.Sprintf("%v", t.In(loc).Format("20060102"))
+		} else {
+			fmt.Println("parse time err:", err.Error())
+		}
+	} else if strings.Contains(cellTime, " hrs") {
+		ch := GetCurrentHour()
+		arr := strings.Split(cellTime, " hrs")
+		if len(arr) >= 1 {
+			ph, err := strconv.Atoi(arr[0])
+			if err == nil && ph > ch {
+				date = GetYesterdayDate()
+			}
+		}
+	}
+
+	return date
 }
