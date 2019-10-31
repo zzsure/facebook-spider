@@ -6,6 +6,7 @@ import (
 	"gitlab.azbit.cn/web/facebook-spider/conf"
 	"gitlab.azbit.cn/web/facebook-spider/library/util"
 	"gitlab.azbit.cn/web/facebook-spider/models"
+	"net/http"
 	"strings"
 )
 
@@ -61,7 +62,7 @@ func StartCrawlTask(fds []*models.FileData) {
 // craw data by goquery
 func crawlByGoquery(url, lang string) ([]*models.ArticleData, error) {
 	// Request the HTML page.
-	/*res, err := http.Get(url)
+	res, err := http.Get(url)
 	if err != nil {
 		logger.Error("http error:", err)
 	}
@@ -74,25 +75,30 @@ func crawlByGoquery(url, lang string) ([]*models.ArticleData, error) {
 	doc, err := goquery.NewDocumentFromReader(res.Body)
 	if err != nil {
 		logger.Error("document reader error:", err)
-	}*/
+	}
 
 	// TODO: for test
-	html, _ := util.ReadStringFromFile("./data/res.html")
-	doc, err := goquery.NewDocumentFromReader(strings.NewReader(html))
-	if err != nil {
-		logger.Error("document reader error:", err)
-	}
+	//html, _ := util.ReadStringFromFile("./data/res.html")
+	//doc, err := goquery.NewDocumentFromReader(strings.NewReader(html))
+	//if err != nil {
+	//	logger.Error("document reader error:", err)
+	//}
 
 	var rets []*models.ArticleData
 	// Find the review items
-	doc.Find("._4-u2 .userContent").Each(func(i int, s *goquery.Selection) {
+	doc.Find(".userContentWrapper").Each(func(i int, s *goquery.Selection) {
 		posts := ""
-		var comments []string
 		s.Find("p").Each(func(i int, s *goquery.Selection) {
 			posts += strings.TrimLeft(s.Text(), " ") + "\n"
 		})
 		logger.Info("idx: ", i, "ret: ", posts)
+
+		timeStr := s.Find(".timestampContent").Text()
+		logger.Info("time string is:", timeStr)
+
+		var comments []string
 		ad := &models.ArticleData{
+			Date:     timeStr,
 			Posts:    posts,
 			Comments: comments,
 		}
