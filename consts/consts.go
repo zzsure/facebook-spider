@@ -2,9 +2,11 @@ package consts
 
 // crawler
 const (
-	POST_FILE_PREFIX    = "posts-"
-	COMMENT_FILE_PREFIX = "comments-"
-	POST_URL_FORMAT     = "https://facebook.com/pg/%s/posts/"
-	TIME_ZONE           = "America/New_York"
-	MAX_SLEEP_TIME      = 10
+	POST_FILE_PREFIX      = "posts-"
+	COMMENT_FILE_PREFIX   = "comments-"
+	POST_URL_FORMAT       = "https://facebook.com/pg/%s/posts/"
+	TIME_ZONE             = "America/New_York"
+	MAX_SLEEP_TIME        = 10
+	FACEBOOK_DOMAIN       = "www.facebook.com"
+	BASIC_FACEBOOK_DOMAIN = "mbasic.facebook.com"
 )

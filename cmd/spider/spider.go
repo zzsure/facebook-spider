@@ -42,5 +42,6 @@ func run(c *cli.Context) {
 	}
 
 	// start a crawl cron task
-	crawler.StartCrawlTask(fds)
+	//crawler.StartCrawlTask(fds)
+	crawler.StartBasicCrawlTask(fds)
 }

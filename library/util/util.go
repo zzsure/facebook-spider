@@ -8,6 +8,7 @@ import (
 	"gitlab.azbit.cn/web/facebook-spider/consts"
 	"gitlab.azbit.cn/web/facebook-spider/models"
 	"io/ioutil"
+	"net/http"
 	"os"
 	"path"
 	"strconv"
@@ -22,6 +23,11 @@ func PrettyPrint(v interface{}) (err error) {
 		fmt.Println(string(b))
 	}
 	return
+}
+
+// get facebook mobile website
+func GetMobilePostURL(url string) string {
+	return strings.Replace(url, consts.FACEBOOK_DOMAIN, consts.BASIC_FACEBOOK_DOMAIN, 1)
 }
 
 // get official account post url by url
@@ -117,6 +123,27 @@ func CheckFileIsExist(path string) bool {
 		exist = false
 	}
 	return exist
+}
+
+// request url
+func RequestUrl(url string) ([]byte, error) {
+	// Request the HTML page.
+	client := &http.Client{}
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Add("Accept-Language", "en-US,en;q=0.9")
+	res, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer res.Body.Close()
+	if res.StatusCode != 200 {
+		return nil, err
+	}
+
+	return ioutil.ReadAll(res.Body)
 }
 
 // read url and language information from csv file

@@ -1,19 +1,40 @@
 package crawler
 
 import (
+	"bytes"
+	"compress/gzip"
+	"fmt"
 	"github.com/PuerkitoBio/goquery"
+	"github.com/gocolly/colly"
+	"github.com/gocolly/colly/extensions"
 	"github.com/op/go-logging"
 	"gitlab.azbit.cn/web/facebook-spider/conf"
 	"gitlab.azbit.cn/web/facebook-spider/consts"
 	"gitlab.azbit.cn/web/facebook-spider/library/util"
 	"gitlab.azbit.cn/web/facebook-spider/models"
+	"io/ioutil"
 	"math/rand"
-	"net/http"
 	"strings"
 	"time"
 )
 
 var logger = logging.MustGetLogger("modules/crawler")
+
+// a cron task
+func StartBasicCrawlTask(fds []*models.FileData) {
+	for _, fd := range fds {
+		url := util.GetMobilePostURL(fd.URL)
+		logger.Info("crawl url:", url, " begin")
+		b, err := util.RequestUrl(url)
+		if err != nil {
+			logger.Error("request url:", url, " err:", err)
+		}
+		// TODO: for test save html to data
+		_ = util.SaveStringToFile("./data", "basic.html", string(b))
+
+		break
+	}
+}
 
 // a cron tas
 func StartCrawlTask(fds []*models.FileData) {
@@ -29,6 +50,7 @@ func StartCrawlTask(fds []*models.FileData) {
 		// crawl data to ads
 		logger.Info("crawl url:", url, " begin")
 		ads, err := crawlByGoquery(url, "en")
+		//ads, err := crawlByColly(url, "en")
 
 		if err != nil {
 			logger.Error("crawl url:", url, " err:", err)
@@ -45,7 +67,7 @@ func StartCrawlTask(fds []*models.FileData) {
 		rs := rand.Intn(consts.MAX_SLEEP_TIME)
 		logger.Info("random sleep seconds:", rs)
 		time.Sleep(time.Duration(rs) * time.Second)
-		//break
+		break
 	}
 }
 
@@ -101,28 +123,13 @@ func saveArticleDataToFile(ads []*models.ArticleData, url string) error {
 
 // craw data by goquery
 func crawlByGoquery(url, lang string) ([]*models.ArticleData, error) {
-	// Request the HTML page.
-	client := &http.Client{}
-	req, err := http.NewRequest("GET", url, nil)
+	// request url get response
+	b, err := util.RequestUrl(url)
 	if err != nil {
-		logger.Error("new request error:", err)
+		return nil, err
 	}
-	req.Header.Add("Accept-Language", "en-US,en;q=0.9")
-	res, err := client.Do(req)
-	if err != nil {
-		logger.Error("http client do error:", err)
-	}
-	defer res.Body.Close()
-	if res.StatusCode != 200 {
-		logger.Error("status code error:", res.StatusCode, res.Status)
-	}
-
-	// TODO: for test save html to data
-	//body, err := ioutil.ReadAll(res.Body)
-	//_ = util.SaveStringToFile("./data", "res_20191030.html", string(body))
-
 	// Load the HTML document
-	doc, err := goquery.NewDocumentFromReader(res.Body)
+	doc, err := goquery.NewDocumentFromReader(strings.NewReader(string(b)))
 	if err != nil {
 		logger.Error("document reader error:", err)
 	}
@@ -164,4 +171,50 @@ func crawlByGoquery(url, lang string) ([]*models.ArticleData, error) {
 	//	ret = title
 	//})
 	return rets, nil
+}
+
+func crawlByColly(url, lang string) ([]*models.ArticleData, error) {
+	c := colly.NewCollector()
+	extensions.RandomUserAgent(c)
+	extensions.Referer(c)
+	c.OnRequest(func(r *colly.Request) {
+		//r.Headers.Set("Host", "facebook.com")
+		r.Headers.Set("Connection", "keep-alive")
+		r.Headers.Set("Accept", "/*")
+		//r.Headers.Set("Origin", "http://facebook.com")
+		r.Headers.Set("Accept-Encoding", "gzip, deflate, br")
+		r.Headers.Set("Accept-Language", "zh-CN,zh;q=0.9;en-US,en;q=0.8")
+		r.Headers.Set("Content-Type", "text/html")
+		r.ResponseCharacterEncoding = "utf-8"
+	})
+
+	var err error
+
+	c.OnResponse(func(resp *colly.Response) {
+		ret, err := GzipDecode(resp.Body)
+		if err == nil {
+			fmt.Println(string(ret))
+		} else {
+			logger.Error("parse gzip err:", err)
+		}
+	})
+
+	c.OnError(func(resp *colly.Response, errHttp error) {
+		err = errHttp
+	})
+
+	err = c.Visit(url)
+
+	return nil, err
+}
+
+func GzipDecode(in []byte) ([]byte, error) {
+	reader, err := gzip.NewReader(bytes.NewReader(in))
+	if err != nil {
+		var out []byte
+		return out, err
+	}
+	defer reader.Close()
+
+	return ioutil.ReadAll(reader)
 }
