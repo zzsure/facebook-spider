@@ -3,6 +3,7 @@ package crawler
 import (
 	"bytes"
 	"compress/gzip"
+	"errors"
 	"fmt"
 	"github.com/PuerkitoBio/goquery"
 	"github.com/gocolly/colly"
@@ -21,19 +22,47 @@ import (
 var logger = logging.MustGetLogger("modules/crawler")
 
 // a cron task
-func StartBasicCrawlTask(fds []*models.FileData) {
+func StartBasicCrawlTask(fds []*models.FileData) error {
+	if !login() {
+		return errors.New("login error")
+	}
 	for _, fd := range fds {
 		url := util.GetMobilePostURL(fd.URL)
 		logger.Info("crawl url:", url, " begin")
-		b, err := util.RequestUrl(url)
+		/*b, err := util.RequestUrl(url)
 		if err != nil {
 			logger.Error("request url:", url, " err:", err)
 		}
 		// TODO: for test save html to data
-		_ = util.SaveStringToFile("./data", "basic.html", string(b))
+		_ = util.SaveStringToFile("./data", "basic.html", string(b))*/
+
+		//html, _ := util.ReadStringFromFile("./data/basic.html")
 
 		break
 	}
+	return nil
+}
+
+// check login
+func login() bool {
+	b, _ := util.RequestUrl(consts.LOGIN_CHECK_URL)
+	doc, err := goquery.NewDocumentFromReader(strings.NewReader(string(b)))
+	if err != nil {
+		logger.Error("document reader error:", err)
+	}
+	isLogin := true
+	doc.Find("#mobile_login_bar a").Each(func(i int, s *goquery.Selection) {
+		logger.Info("i come in...", s.Text())
+		if s.Text() == "Log In" {
+			isLogin = false
+			return
+		}
+	})
+	logger.Info("user login:", isLogin)
+	if !isLogin {
+
+	}
+	return isLogin
 }
 
 // a cron tas
