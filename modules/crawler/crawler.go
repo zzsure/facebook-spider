@@ -1,19 +1,15 @@
 package crawler
 
 import (
-	"bytes"
-	"compress/gzip"
 	"errors"
 	"fmt"
 	"github.com/PuerkitoBio/goquery"
 	"github.com/gocolly/colly"
-	"github.com/gocolly/colly/extensions"
 	"github.com/op/go-logging"
 	"gitlab.azbit.cn/web/facebook-spider/conf"
 	"gitlab.azbit.cn/web/facebook-spider/consts"
 	"gitlab.azbit.cn/web/facebook-spider/library/util"
 	"gitlab.azbit.cn/web/facebook-spider/models"
-	"io/ioutil"
 	"math/rand"
 	"strings"
 	"time"
@@ -23,9 +19,12 @@ var logger = logging.MustGetLogger("modules/crawler")
 
 // a cron task
 func StartBasicCrawlTask(fds []*models.FileData) error {
-	if !login() {
-		return errors.New("login error")
+	_, err := crawlByColly("https://mbasic.facebook.com/", "en")
+	if err != nil {
+		logger.Error("crawl by colly err:", err)
 	}
+	return nil
+
 	for _, fd := range fds {
 		url := util.GetMobilePostURL(fd.URL)
 		logger.Info("crawl url:", url, " begin")
@@ -34,11 +33,14 @@ func StartBasicCrawlTask(fds []*models.FileData) error {
 			logger.Error("request url:", url, " err:", err)
 		}
 		// TODO: for test save html to data
-		_ = util.SaveStringToFile("./data", "basic.html", string(b))*/
+		_ = util.SaveStringToFile("./data", "basic_index.html", string(b))*/
 
 		//html, _ := util.ReadStringFromFile("./data/basic.html")
 
 		break
+	}
+	if !login() {
+		return errors.New("login error")
 	}
 	return nil
 }
@@ -51,13 +53,10 @@ func login() bool {
 		logger.Error("document reader error:", err)
 	}
 	isLogin := true
-	doc.Find("#mobile_login_bar a").Each(func(i int, s *goquery.Selection) {
-		logger.Info("i come in...", s.Text())
-		if s.Text() == "Log In" {
-			isLogin = false
-			return
-		}
-	})
+	title := doc.Find("header title").Text()
+	if strings.Contains(title, consts.LOGIN_CHECK_STRING) {
+		isLogin = false
+	}
 	logger.Info("user login:", isLogin)
 	if !isLogin {
 
@@ -202,29 +201,69 @@ func crawlByGoquery(url, lang string) ([]*models.ArticleData, error) {
 	return rets, nil
 }
 
-func crawlByColly(url, lang string) ([]*models.ArticleData, error) {
+func crawlByColly(url, lang string) ([]byte, error) {
 	c := colly.NewCollector()
-	extensions.RandomUserAgent(c)
-	extensions.Referer(c)
+	//extensions.RandomUserAgent(c)
+	//extensions.Referer(c)
+
 	c.OnRequest(func(r *colly.Request) {
-		//r.Headers.Set("Host", "facebook.com")
+		r.Headers.Set("Host", "facebook.com")
 		r.Headers.Set("Connection", "keep-alive")
-		r.Headers.Set("Accept", "/*")
-		//r.Headers.Set("Origin", "http://facebook.com")
-		r.Headers.Set("Accept-Encoding", "gzip, deflate, br")
-		r.Headers.Set("Accept-Language", "zh-CN,zh;q=0.9;en-US,en;q=0.8")
+		r.Headers.Set("Accept", "*/*")
+		r.Headers.Set("Origin", "https://mbasic.facebook.com/")
+		//r.Headers.Set("Accept-Encoding", "gzip, deflate, br")
+		r.Headers.Set("Referer", "https://mbasic.facebook.com/")
+		//r.Headers.Set("Accept-Language", "zh-CN,zh;q=0.9;en-US,en;q=0.8")
+		r.Headers.Set("Accept-Language", "en-US,en;q=0.8")
 		r.Headers.Set("Content-Type", "text/html")
+		r.Headers.Set("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/78.0.3904.87 Safari/537.36")
 		r.ResponseCharacterEncoding = "utf-8"
 	})
-
+	// https://mbasic.facebook.com/login/device-based/regular/login/?refsrc=https%3A%2F%2Fmbasic.facebook.com%2F&lwv=100&refid=8
+	//lsd: AVr7ySCP
+	//jazoest: 2671
+	//m_ts: 1573108965
+	//li: trzDXTJqUodlele3wo2bPUCq
+	//try_number: 0
+	//unrecognized_tries: 0
+	//email: 18801090613
+	//pass: I7*FUZd5
+	//login: Log In
+	// datr=jrnDXdWs41-YAcCqwuo7uNdS; sb=jrnDXbWnmlDBdnx8M-Nyjy6Q; c_user=100042468376443; xs=9%3AoN3FER5Grt_86g%3A2%3A1573108637%3A-1%3A-1; fr=32Np1ktt80sXSbimH.AWX1YD2zvO9LSbnIfQPPD_kCzHQ.Bdw7ud.O8.AAA.0.0.Bdw7ud.AWW7OU0J
 	var err error
 
+	c.OnHTML("#login_form", func(e *colly.HTMLElement) {
+		loginURL, exists := e.DOM.Attr("action")
+		if !exists {
+			err = errors.New("doesn't have action label")
+			return
+		}
+		loginURL = fmt.Sprintf("https://mbasic.facebook.com%s", loginURL)
+		logger.Info("login url is:", loginURL)
+		reqMap := make(map[string]string)
+		e.DOM.Find("input").Each(func(i int, s *goquery.Selection) {
+			name, _ := s.Attr("name")
+			value, _ := s.Attr("value")
+			if name != "" && value != "" && name != "sign_up" {
+				reqMap[name] = value
+			}
+		})
+		reqMap["email"] = "18810572605"
+		reqMap["pass"] = "4ocjR&SN"
+		logger.Info("req map:", reqMap)
+		for _, cookie := range c.Cookies("https://mbasic.facebook.com") {
+			logger.Info("cookie", cookie.Value)
+		}
+		err = c.Post(loginURL, reqMap)
+		logger.Error("post err:", err)
+	})
+
 	c.OnResponse(func(resp *colly.Response) {
-		ret, err := GzipDecode(resp.Body)
-		if err == nil {
-			fmt.Println(string(ret))
-		} else {
-			logger.Error("parse gzip err:", err)
+		logger.Info(string(resp.Body))
+		// cookie: datr=mrzDXdgeLArnpjRXz98ll3YE; sb=mrzDXRO23kG6ft4c3U37GeAu
+		//_ = util.SaveStringToFile("./data", "basic_index.html", string(resp.Body))
+		for _, cookie := range c.Cookies("https://mbasic.facebook.com") {
+			logger.Info("cookie", cookie.Value)
 		}
 	})
 
@@ -235,15 +274,4 @@ func crawlByColly(url, lang string) ([]*models.ArticleData, error) {
 	err = c.Visit(url)
 
 	return nil, err
-}
-
-func GzipDecode(in []byte) ([]byte, error) {
-	reader, err := gzip.NewReader(bytes.NewReader(in))
-	if err != nil {
-		var out []byte
-		return out, err
-	}
-	defer reader.Close()
-
-	return ioutil.ReadAll(reader)
 }

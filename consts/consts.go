@@ -9,5 +9,6 @@ const (
 	MAX_SLEEP_TIME        = 10
 	FACEBOOK_DOMAIN       = "www.facebook.com"
 	BASIC_FACEBOOK_DOMAIN = "mbasic.facebook.com"
-	LOGIN_CHECK_URL       = "https://mbasic.facebook.com/Vogue"
+	LOGIN_CHECK_URL       = "https://mbasic.facebook.com/"
+	LOGIN_CHECK_STRING    = "Log In"
 )
