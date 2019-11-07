@@ -219,17 +219,7 @@ func crawlByColly(url, lang string) ([]byte, error) {
 		r.Headers.Set("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/78.0.3904.87 Safari/537.36")
 		r.ResponseCharacterEncoding = "utf-8"
 	})
-	// https://mbasic.facebook.com/login/device-based/regular/login/?refsrc=https%3A%2F%2Fmbasic.facebook.com%2F&lwv=100&refid=8
-	//lsd: AVr7ySCP
-	//jazoest: 2671
-	//m_ts: 1573108965
-	//li: trzDXTJqUodlele3wo2bPUCq
-	//try_number: 0
-	//unrecognized_tries: 0
-	//email: 18801090613
-	//pass: I7*FUZd5
-	//login: Log In
-	// datr=jrnDXdWs41-YAcCqwuo7uNdS; sb=jrnDXbWnmlDBdnx8M-Nyjy6Q; c_user=100042468376443; xs=9%3AoN3FER5Grt_86g%3A2%3A1573108637%3A-1%3A-1; fr=32Np1ktt80sXSbimH.AWX1YD2zvO9LSbnIfQPPD_kCzHQ.Bdw7ud.O8.AAA.0.0.Bdw7ud.AWW7OU0J
+
 	var err error
 
 	c.OnHTML("#login_form", func(e *colly.HTMLElement) {
@@ -251,20 +241,12 @@ func crawlByColly(url, lang string) ([]byte, error) {
 		reqMap["email"] = "18810572605"
 		reqMap["pass"] = "4ocjR&SN"
 		logger.Info("req map:", reqMap)
-		for _, cookie := range c.Cookies("https://mbasic.facebook.com") {
-			logger.Info("cookie", cookie.Value)
-		}
 		err = c.Post(loginURL, reqMap)
 		logger.Error("post err:", err)
 	})
 
 	c.OnResponse(func(resp *colly.Response) {
 		logger.Info(string(resp.Body))
-		// cookie: datr=mrzDXdgeLArnpjRXz98ll3YE; sb=mrzDXRO23kG6ft4c3U37GeAu
-		//_ = util.SaveStringToFile("./data", "basic_index.html", string(resp.Body))
-		for _, cookie := range c.Cookies("https://mbasic.facebook.com") {
-			logger.Info("cookie", cookie.Value)
-		}
 	})
 
 	c.OnError(func(resp *colly.Response, errHttp error) {
