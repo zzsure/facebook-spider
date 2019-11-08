@@ -6,6 +6,7 @@ import (
 	"github.com/PuerkitoBio/goquery"
 	"github.com/gocolly/colly"
 	"github.com/gocolly/colly/extensions"
+	"github.com/juju/persistent-cookiejar"
 	"github.com/op/go-logging"
 	"gitlab.azbit.cn/web/facebook-spider/conf"
 	"gitlab.azbit.cn/web/facebook-spider/consts"
@@ -17,6 +18,22 @@ import (
 )
 
 var logger = logging.MustGetLogger("modules/crawler")
+
+func Init() {
+	c := colly.NewCollector()
+	c.OnRequest(func(r *colly.Request) {
+		j, err := cookiejar.New(&cookiejar.Options{Filename: "cookie.db"})
+		if err == nil {
+			err = c.SetCookies(consts.LOGIN_CHECK_URL, j.Cookies(r.URL))
+			if err != nil {
+				logger.Error("set cookies err:", err)
+			}
+		} else {
+			logger.Error("cookie jar new err:", err)
+		}
+	})
+	_ = c.Visit(consts.LOGIN_CHECK_URL)
+}
 
 // a cron task
 func StartBasicCrawlTask(fds []*models.FileData) error {
@@ -31,12 +48,12 @@ func StartBasicCrawlTask(fds []*models.FileData) error {
 		url := util.GetMobilePostURL(fd.URL)
 		logger.Info("crawl url:", url, " begin")
 
-		content, err := crawlByColly(url)
+		_, err := crawlByColly(url)
 		if err != nil {
 			return err
 		}
 
-		logger.Info("url:", url, ", content:", string(content))
+		//logger.Info("url:", url, ", content:", string(content))
 
 		break
 	}
@@ -263,6 +280,18 @@ func login() error {
 
 	c.OnResponse(func(resp *colly.Response) {
 		logger.Info("login:", string(resp.Body))
+		// save cookies
+		cookies := c.Cookies(consts.LOGIN_CHECK_URL)
+		j, errCookie := cookiejar.New(&cookiejar.Options{Filename: "cookie.db"})
+		if errCookie == nil {
+			j.SetCookies(resp.Request.URL, cookies)
+			errCookie = j.Save()
+			if errCookie != nil {
+				logger.Error("save cookies err:", errCookie)
+			}
+		} else {
+			logger.Error("cookie new err:", errCookie)
+		}
 	})
 
 	c.OnError(func(resp *colly.Response, errHttp error) {
