@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/PuerkitoBio/goquery"
 	"github.com/gocolly/colly"
+	"github.com/gocolly/colly/extensions"
 	"github.com/op/go-logging"
 	"gitlab.azbit.cn/web/facebook-spider/conf"
 	"gitlab.azbit.cn/web/facebook-spider/consts"
@@ -19,49 +20,27 @@ var logger = logging.MustGetLogger("modules/crawler")
 
 // a cron task
 func StartBasicCrawlTask(fds []*models.FileData) error {
-	_, err := crawlByColly("https://mbasic.facebook.com/", "en")
-	if err != nil {
-		logger.Error("crawl by colly err:", err)
+	if !isLogin() {
+		err := login()
+		if err != nil {
+			return err
+		}
 	}
-	return nil
 
 	for _, fd := range fds {
 		url := util.GetMobilePostURL(fd.URL)
 		logger.Info("crawl url:", url, " begin")
-		/*b, err := util.RequestUrl(url)
-		if err != nil {
-			logger.Error("request url:", url, " err:", err)
-		}
-		// TODO: for test save html to data
-		_ = util.SaveStringToFile("./data", "basic_index.html", string(b))*/
 
-		//html, _ := util.ReadStringFromFile("./data/basic.html")
+		content, err := crawlByColly(url)
+		if err != nil {
+			return err
+		}
+
+		logger.Info("url:", url, ", content:", string(content))
 
 		break
 	}
-	if !login() {
-		return errors.New("login error")
-	}
 	return nil
-}
-
-// check login
-func login() bool {
-	b, _ := util.RequestUrl(consts.LOGIN_CHECK_URL)
-	doc, err := goquery.NewDocumentFromReader(strings.NewReader(string(b)))
-	if err != nil {
-		logger.Error("document reader error:", err)
-	}
-	isLogin := true
-	title := doc.Find("header title").Text()
-	if strings.Contains(title, consts.LOGIN_CHECK_STRING) {
-		isLogin = false
-	}
-	logger.Info("user login:", isLogin)
-	if !isLogin {
-
-	}
-	return isLogin
 }
 
 // a cron tas
@@ -201,35 +180,73 @@ func crawlByGoquery(url, lang string) ([]*models.ArticleData, error) {
 	return rets, nil
 }
 
-func crawlByColly(url, lang string) ([]byte, error) {
+// crawl by colly
+func crawlByColly(url string) ([]byte, error) {
 	c := colly.NewCollector()
-	//extensions.RandomUserAgent(c)
-	//extensions.Referer(c)
-
+	extensions.RandomUserAgent(c)
+	extensions.Referer(c)
 	c.OnRequest(func(r *colly.Request) {
 		r.Headers.Set("Host", "facebook.com")
 		r.Headers.Set("Connection", "keep-alive")
-		r.Headers.Set("Accept", "*/*")
-		r.Headers.Set("Origin", "https://mbasic.facebook.com/")
-		//r.Headers.Set("Accept-Encoding", "gzip, deflate, br")
-		r.Headers.Set("Referer", "https://mbasic.facebook.com/")
-		//r.Headers.Set("Accept-Language", "zh-CN,zh;q=0.9;en-US,en;q=0.8")
 		r.Headers.Set("Accept-Language", "en-US,en;q=0.8")
-		r.Headers.Set("Content-Type", "text/html")
-		r.Headers.Set("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/78.0.3904.87 Safari/537.36")
 		r.ResponseCharacterEncoding = "utf-8"
 	})
 
 	var err error
+	var content []byte
 
+	c.OnResponse(func(resp *colly.Response) {
+		content = resp.Body
+		//logger.Info("crawl:", string(resp.Body))
+	})
+
+	c.OnError(func(resp *colly.Response, errHttp error) {
+		err = errHttp
+	})
+
+	errVisit := c.Visit(url)
+	if errVisit != nil {
+		return nil, errVisit
+	}
+
+	return content, err
+}
+
+// check login
+func isLogin() bool {
+	c := colly.NewCollector()
+	for _, cookie := range c.Cookies(consts.LOGIN_CHECK_URL) {
+		if strings.Contains(cookie.String(), "c_user") {
+			logger.Info("have login")
+			return true
+		}
+	}
+	logger.Info("have not login")
+	return false
+}
+
+// log in mbasic facebook
+func login() error {
+	c := colly.NewCollector()
+	extensions.RandomUserAgent(c)
+	extensions.Referer(c)
+	c.OnRequest(func(r *colly.Request) {
+		r.Headers.Set("Host", "facebook.com")
+		r.Headers.Set("Connection", "keep-alive")
+		r.Headers.Set("Accept-Language", "en-US,en;q=0.8")
+		r.ResponseCharacterEncoding = "utf-8"
+	})
+
+	var err error
 	c.OnHTML("#login_form", func(e *colly.HTMLElement) {
 		loginURL, exists := e.DOM.Attr("action")
 		if !exists {
 			err = errors.New("doesn't have action label")
 			return
 		}
-		loginURL = fmt.Sprintf("https://mbasic.facebook.com%s", loginURL)
+		loginURL = fmt.Sprintf("%s%s", strings.TrimRight(consts.LOGIN_CHECK_URL, "/"), loginURL)
 		logger.Info("login url is:", loginURL)
+
 		reqMap := make(map[string]string)
 		e.DOM.Find("input").Each(func(i int, s *goquery.Selection) {
 			name, _ := s.Attr("name")
@@ -238,22 +255,24 @@ func crawlByColly(url, lang string) ([]byte, error) {
 				reqMap[name] = value
 			}
 		})
-		reqMap["email"] = "18810572605"
-		reqMap["pass"] = "4ocjR&SN"
-		logger.Info("req map:", reqMap)
+		reqMap["email"] = conf.Config.FaceBook.Account
+		reqMap["pass"] = conf.Config.FaceBook.Password
+		logger.Info("login req map:", reqMap)
 		err = c.Post(loginURL, reqMap)
-		logger.Error("post err:", err)
 	})
 
 	c.OnResponse(func(resp *colly.Response) {
-		logger.Info(string(resp.Body))
+		logger.Info("login:", string(resp.Body))
 	})
 
 	c.OnError(func(resp *colly.Response, errHttp error) {
 		err = errHttp
 	})
 
-	err = c.Visit(url)
+	errVisit := c.Visit(consts.LOGIN_CHECK_URL)
+	if errVisit != nil {
+		return errVisit
+	}
 
-	return nil, err
+	return err
 }

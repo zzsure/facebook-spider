@@ -5,3 +5,7 @@ Type = "raw"
 CsvPath = "./data/urls.csv"
 ArticleBaseDir = "./data/"
 CrawlInterval = 3600
+
+[FaceBook]
+Account = "18810572605"
+Password = "4ocjR&SN"

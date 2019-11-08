@@ -37,11 +37,14 @@ func run(c *cli.Context) {
 	// read urls from csv file
 	fds, err := util.ReadUrlsFromCsv(conf.Config.Spider.CsvPath)
 	if err != nil {
-		//logger.Error("read data from csv file err:", err)
+		logger.Error("read data from csv file err:", err)
 		panic(err)
 	}
 
 	// start a crawl cron task
 	//crawler.StartCrawlTask(fds)
-	crawler.StartBasicCrawlTask(fds)
+	err = crawler.StartBasicCrawlTask(fds)
+	if err != nil {
+		logger.Error("crawl err:", err)
+	}
 }
