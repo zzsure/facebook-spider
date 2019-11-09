@@ -6,7 +6,6 @@ import (
 	"github.com/PuerkitoBio/goquery"
 	"github.com/gocolly/colly"
 	"github.com/gocolly/colly/extensions"
-	"github.com/juju/persistent-cookiejar"
 	"github.com/op/go-logging"
 	"gitlab.azbit.cn/web/facebook-spider/conf"
 	"gitlab.azbit.cn/web/facebook-spider/consts"
@@ -22,17 +21,8 @@ var logger = logging.MustGetLogger("modules/crawler")
 func Init() {
 	c := colly.NewCollector()
 	c.OnRequest(func(r *colly.Request) {
-		j, err := cookiejar.New(&cookiejar.Options{Filename: "cookie.db"})
-		if err == nil {
-			err = c.SetCookies(consts.LOGIN_CHECK_URL, j.Cookies(r.URL))
-			if err != nil {
-				logger.Error("set cookies err:", err)
-			}
-		} else {
-			logger.Error("cookie jar new err:", err)
-		}
 	})
-	_ = c.Visit(consts.LOGIN_CHECK_URL)
+	//_ = c.Visit(consts.LOGIN_CHECK_URL)
 }
 
 // a cron task
@@ -281,7 +271,7 @@ func login() error {
 	c.OnResponse(func(resp *colly.Response) {
 		logger.Info("login:", string(resp.Body))
 		// save cookies
-		cookies := c.Cookies(consts.LOGIN_CHECK_URL)
+		/*cookies := c.Cookies(consts.LOGIN_CHECK_URL)
 		j, errCookie := cookiejar.New(&cookiejar.Options{Filename: "cookie.db"})
 		if errCookie == nil {
 			j.SetCookies(resp.Request.URL, cookies)
@@ -291,7 +281,7 @@ func login() error {
 			}
 		} else {
 			logger.Error("cookie new err:", errCookie)
-		}
+		}*/
 	})
 
 	c.OnError(func(resp *colly.Response, errHttp error) {
