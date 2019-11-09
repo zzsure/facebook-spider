@@ -10,6 +10,7 @@ import (
 	"gitlab.azbit.cn/web/facebook-spider/conf"
 	"gitlab.azbit.cn/web/facebook-spider/consts"
 	"gitlab.azbit.cn/web/facebook-spider/library/util"
+	"gitlab.azbit.cn/web/facebook-spider/library/storage"
 	"gitlab.azbit.cn/web/facebook-spider/models"
 	"math/rand"
 	"strings"
@@ -22,6 +23,7 @@ func Init() {
 	c := colly.NewCollector()
 	c.OnRequest(func(r *colly.Request) {
 	})
+
 	//_ = c.Visit(consts.LOGIN_CHECK_URL)
 }
 
@@ -38,12 +40,12 @@ func StartBasicCrawlTask(fds []*models.FileData) error {
 		url := util.GetMobilePostURL(fd.URL)
 		logger.Info("crawl url:", url, " begin")
 
-		_, err := crawlByColly(url)
+		content, err := crawlByColly(url)
 		if err != nil {
 			return err
 		}
 
-		//logger.Info("url:", url, ", content:", string(content))
+		logger.Info("url:", url, ", content:", string(content))
 
 		break
 	}
@@ -190,6 +192,8 @@ func crawlByGoquery(url, lang string) ([]*models.ArticleData, error) {
 // crawl by colly
 func crawlByColly(url string) ([]byte, error) {
 	c := colly.NewCollector()
+    c.SetStorage(storage.StorageIns)
+    c.AllowURLRevisit = true
 	extensions.RandomUserAgent(c)
 	extensions.Referer(c)
 	c.OnRequest(func(r *colly.Request) {
@@ -222,7 +226,9 @@ func crawlByColly(url string) ([]byte, error) {
 // check login
 func isLogin() bool {
 	c := colly.NewCollector()
+    c.SetStorage(storage.StorageIns)
 	for _, cookie := range c.Cookies(consts.LOGIN_CHECK_URL) {
+        logger.Info("cookie:", cookie.String())
 		if strings.Contains(cookie.String(), "c_user") {
 			logger.Info("have login")
 			return true
@@ -235,6 +241,7 @@ func isLogin() bool {
 // log in mbasic facebook
 func login() error {
 	c := colly.NewCollector()
+    c.SetStorage(storage.StorageIns)
 	extensions.RandomUserAgent(c)
 	extensions.Referer(c)
 	c.OnRequest(func(r *colly.Request) {
