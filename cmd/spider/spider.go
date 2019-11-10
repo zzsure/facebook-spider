@@ -5,8 +5,8 @@ import (
 	"github.com/urfave/cli"
 	"gitlab.azbit.cn/web/facebook-spider/conf"
 	"gitlab.azbit.cn/web/facebook-spider/library/log"
-	"gitlab.azbit.cn/web/facebook-spider/library/util"
 	"gitlab.azbit.cn/web/facebook-spider/library/storage"
+	"gitlab.azbit.cn/web/facebook-spider/library/util"
 	"gitlab.azbit.cn/web/facebook-spider/modules/crawler"
 )
 
@@ -34,7 +34,7 @@ var logger = logging.MustGetLogger("cmd/spider")
 func run(c *cli.Context) {
 	conf.Init(c.String("conf"), c.String("args"))
 	log.Init()
-    storage.Init()
+	storage.Init()
 
 	// read urls from csv file
 	fds, err := util.ReadUrlsFromCsv(conf.Config.Spider.CsvPath)

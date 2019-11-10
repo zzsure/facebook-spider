@@ -10,6 +10,7 @@ type ConfigTOML struct {
 		CsvPath        string `required:"true" flagUsage:"需要抓取facebook公众号的地址文件"`
 		ArticleBaseDir string `required:"true" flagUsage:"存储抓取文章存储的目录"`
 		CrawlInterval  int    `required:"true" default:"3600" flagUsage:"需要隔多长时间抓取一次"`
+		RepeatDays     int    `required:"true" default:"7" flagUsage:"需要抓几天前的"`
 	}
 
 	FaceBook struct {

@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"os"
 	"path"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -109,10 +110,10 @@ func GetCurrentHour() int {
 }
 
 // get interval date
-func GetYesterdayDate() string {
+func GetOffsetDateStr(offset int) string {
 	loc, _ := time.LoadLocation(consts.TIME_ZONE)
 	nTime := time.Now().In(loc)
-	yesTime := nTime.AddDate(0, 0, -1)
+	yesTime := nTime.AddDate(0, 0, offset)
 	return yesTime.Format("20060102")
 }
 
@@ -166,12 +167,12 @@ func GetPostFileName(d string) string {
 }
 
 // get comment file name
-func GetCommentsFileName(d string) string {
+func GetCommentFileName(d string) string {
 	return fmt.Sprintf("%s%s", consts.COMMENT_FILE_PREFIX, d)
 }
 
-// get post dir
-func GetPostsDir(dir, url string) (string, error) {
+// get article dir
+func GetArticleDir(dir, url string) (string, error) {
 	//dir := strings.TrimRight(conf.Config.Spider.ArticleBaseDir, "/")
 	name, err := GetOfficialAccountName(url)
 	if err != nil {
@@ -187,7 +188,7 @@ func GetDateByCellTime(cellTime string) string {
 	date := GetCurrentDate()
 
 	if strings.Contains(cellTime, "Yesterday") {
-		date = GetYesterdayDate()
+		date = GetOffsetDateStr(-1)
 	} else if strings.Contains(cellTime, "at") {
 		loc, _ := time.LoadLocation(consts.TIME_ZONE)
 		tmp := GetCurrentYear() + " " + cellTime
@@ -203,10 +204,17 @@ func GetDateByCellTime(cellTime string) string {
 		if len(arr) >= 1 {
 			ph, err := strconv.Atoi(arr[0])
 			if err == nil && ph > ch {
-				date = GetYesterdayDate()
+				date = GetOffsetDateStr(-1)
 			}
 		}
 	}
 
 	return date
+}
+
+// Is string contain number
+func IsContainNumber(s string) bool {
+	pattern := "\\d+"
+	ret, _ := regexp.MatchString(pattern, s)
+	return ret
 }
