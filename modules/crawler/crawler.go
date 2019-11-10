@@ -9,8 +9,8 @@ import (
 	"github.com/op/go-logging"
 	"gitlab.azbit.cn/web/facebook-spider/conf"
 	"gitlab.azbit.cn/web/facebook-spider/consts"
-	"gitlab.azbit.cn/web/facebook-spider/library/util"
 	"gitlab.azbit.cn/web/facebook-spider/library/storage"
+	"gitlab.azbit.cn/web/facebook-spider/library/util"
 	"gitlab.azbit.cn/web/facebook-spider/models"
 	"math/rand"
 	"strings"
@@ -19,12 +19,18 @@ import (
 
 var logger = logging.MustGetLogger("modules/crawler")
 
-func Init() {
-	c := colly.NewCollector()
-	c.OnRequest(func(r *colly.Request) {
-	})
+// a cron task
+func StartBasicCrawlTask1(fds []*models.FileData) error {
+	// TODO: for test
+	html, _ := util.ReadStringFromFile("./data/vogue.html")
+	ads, err := parseArticle([]byte(html))
 
-	//_ = c.Visit(consts.LOGIN_CHECK_URL)
+	// save article data to file
+	err = saveArticleDataToFile(ads, "https://www.facebook.com/Vogue/")
+	if err != nil {
+		logger.Error("save article data err:", err)
+	}
+	return nil
 }
 
 // a cron task
@@ -45,34 +51,8 @@ func StartBasicCrawlTask(fds []*models.FileData) error {
 			return err
 		}
 
+		ads, err := parseArticle(content)
 		logger.Info("url:", url, ", content:", string(content))
-
-		break
-	}
-	return nil
-}
-
-// a cron tas
-func StartCrawlTask(fds []*models.FileData) {
-	// TODO: add a cron
-	for _, fd := range fds {
-		//err := crawl(fd.URL, fd.Lang)
-		url, err := util.GetOfficialAccountPostURL(fd.URL)
-		if err != nil {
-			logger.Error("parse url err:", err)
-			continue
-		}
-
-		// crawl data to ads
-		logger.Info("crawl url:", url, " begin")
-		ads, err := crawlByGoquery(url, "en")
-		//ads, err := crawlByColly(url, "en")
-
-		if err != nil {
-			logger.Error("crawl url:", url, " err:", err)
-			continue
-		}
-		logger.Info("crawl url:", url, " end")
 
 		// save article data to file
 		err = saveArticleDataToFile(ads, fd.URL)
@@ -85,6 +65,36 @@ func StartCrawlTask(fds []*models.FileData) {
 		time.Sleep(time.Duration(rs) * time.Second)
 		break
 	}
+	return nil
+}
+
+func parseArticle(b []byte) ([]*models.ArticleData, error) {
+	var rets []*models.ArticleData
+
+	doc, err := goquery.NewDocumentFromReader(strings.NewReader(string(b)))
+	if err != nil {
+		return nil, err
+	}
+	doc.Find("div[role=article]").Each(func(i int, s *goquery.Selection) {
+		posts := ""
+		s.Find("span p").Each(func(i int, s *goquery.Selection) {
+			posts += strings.TrimLeft(s.Text(), " ") + "\n"
+		})
+
+		cellTime := s.Find("abbr").Text()
+		logger.Info("time string is:", cellTime)
+		date := util.GetDateByCellTime(cellTime)
+		logger.Info("date string is:", date)
+
+		var comments []string
+		ad := &models.ArticleData{
+			Date:     date,
+			Posts:    posts,
+			Comments: comments,
+		}
+		rets = append(rets, ad)
+	})
+	return rets, nil
 }
 
 // save article data to file
@@ -137,63 +147,11 @@ func saveArticleDataToFile(ads []*models.ArticleData, url string) error {
 	return nil
 }
 
-// craw data by goquery
-func crawlByGoquery(url, lang string) ([]*models.ArticleData, error) {
-	// request url get response
-	b, err := util.RequestUrl(url)
-	if err != nil {
-		return nil, err
-	}
-	// Load the HTML document
-	doc, err := goquery.NewDocumentFromReader(strings.NewReader(string(b)))
-	if err != nil {
-		logger.Error("document reader error:", err)
-	}
-
-	// TODO: for test
-	//html, _ := util.ReadStringFromFile("./data/res_20191030.html")
-	//doc, err := goquery.NewDocumentFromReader(strings.NewReader(html))
-	//if err != nil {
-	//	logger.Error("document reader error:", err)
-	//}
-
-	var rets []*models.ArticleData
-	// Find the review items
-	doc.Find(".userContentWrapper").Each(func(i int, s *goquery.Selection) {
-		posts := ""
-		s.Find("p").Each(func(i int, s *goquery.Selection) {
-			posts += strings.TrimLeft(s.Text(), " ") + "\n"
-		})
-		logger.Info("idx: ", i, "ret: ", posts)
-
-		cellTime := s.Find(".timestampContent").Text()
-		logger.Info("time string is:", cellTime)
-		date := util.GetDateByCellTime(cellTime)
-		logger.Info("date string is:", date)
-
-		var comments []string
-		ad := &models.ArticleData{
-			Date:     date,
-			Posts:    posts,
-			Comments: comments,
-		}
-		rets = append(rets, ad)
-	})
-	//doc.Find(".sidebar-reviews article .content-block").Each(func(i int, s *goquery.Selection) {
-	//	// For each item found, get the band and title
-	//	band := s.Find("a").Text()
-	//	title := s.Find("i").Text()
-	//	fmt.Printf("Review %d: %s - %s\n", i, band, title)
-	//	ret = title
-	//})
-	return rets, nil
-}
-
 // crawl by colly
 func crawlByColly(url string) ([]byte, error) {
 	c := colly.NewCollector()
-    c.SetStorage(storage.StorageIns)
-    c.AllowURLRevisit = true
+	_ = c.SetStorage(storage.StorageIns)
+	c.AllowURLRevisit = true
 	extensions.RandomUserAgent(c)
 	extensions.Referer(c)
 	c.OnRequest(func(r *colly.Request) {
@@ -226,9 +184,9 @@ func crawlByColly(url string) ([]byte, error) {
 // check login
 func isLogin() bool {
 	c := colly.NewCollector()
-    c.SetStorage(storage.StorageIns)
+	_ = c.SetStorage(storage.StorageIns)
 	for _, cookie := range c.Cookies(consts.LOGIN_CHECK_URL) {
-        logger.Info("cookie:", cookie.String())
+		logger.Info("cookie:", cookie.String())
 		if strings.Contains(cookie.String(), "c_user") {
 			logger.Info("have login")
 			return true
@@ -241,7 +199,7 @@ func isLogin() bool {
 // log in mbasic facebook
 func login() error {
 	c := colly.NewCollector()
-    c.SetStorage(storage.StorageIns)
+	_ = c.SetStorage(storage.StorageIns)
 	extensions.RandomUserAgent(c)
 	extensions.Referer(c)
 	c.OnRequest(func(r *colly.Request) {
@@ -277,18 +235,6 @@ func login() error {
 
 	c.OnResponse(func(resp *colly.Response) {
 		logger.Info("login:", string(resp.Body))
-		// save cookies
-		/*cookies := c.Cookies(consts.LOGIN_CHECK_URL)
-		j, errCookie := cookiejar.New(&cookiejar.Options{Filename: "cookie.db"})
-		if errCookie == nil {
-			j.SetCookies(resp.Request.URL, cookies)
-			errCookie = j.Save()
-			if errCookie != nil {
-				logger.Error("save cookies err:", errCookie)
-			}
-		} else {
-			logger.Error("cookie new err:", errCookie)
-		}*/
 	})
 
 	c.OnError(func(resp *colly.Response, errHttp error) {

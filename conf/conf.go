@@ -19,7 +19,7 @@ type ConfigTOML struct {
 
 	Redis struct {
 		Address  string `required:"true" flagUsage:"服务器地址"`
-		Password string `required:"true" flagUsage:"redis的密码"`
+		Password string `required:"false" flagUsage:"redis的密码"`
 		DB       int    `required:"true" flagUsage:"数据库"`
 		Prefix   string `required:"true" flagUsage:"前缀"`
 	}
