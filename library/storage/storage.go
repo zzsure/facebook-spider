@@ -1,22 +1,23 @@
 package storage
 
-import(
+import (
 	"github.com/gocolly/colly"
-    "github.com/gocolly/redisstorage"
+	"github.com/gocolly/redisstorage"
+	"gitlab.azbit.cn/web/facebook-spider/conf"
 )
 
 var StorageIns *redisstorage.Storage
 
 func Init() {
-    StorageIns = &redisstorage.Storage{
-        Address:  "127.0.0.1:6379",
-        Password: "",
-        DB:       3,
-        Prefix:   "fb",
-    }
-    c := colly.NewCollector()
-    err := c.SetStorage(StorageIns)
-    if err != nil {
-        panic(err)
-    }
+	StorageIns = &redisstorage.Storage{
+		Address:  conf.Config.Redis.Address,
+		Password: conf.Config.Redis.Password,
+		DB:       conf.Config.Redis.DB,
+		Prefix:   conf.Config.Redis.Prefix,
+	}
+	c := colly.NewCollector()
+	err := c.SetStorage(StorageIns)
+	if err != nil {
+		panic(err)
+	}
 }

@@ -17,6 +17,13 @@ type ConfigTOML struct {
 		Password string `required:"true" flagUsage:"密码"`
 	}
 
+	Redis struct {
+		Address  string `required:"true" flagUsage:"服务器地址"`
+		Password string `required:"true" flagUsage:"redis的密码"`
+		DB       int    `required:"true" flagUsage:"数据库"`
+		Prefix   string `required:"true" flagUsage:"前缀"`
+	}
+
 	Log struct {
 		Type  string `default:"json" flagUsage:"日志格式，json|raw"`
 		Level int    `default:"5" flagUsage:"日志级别：0 CRITICAL, 1 ERROR, 2 WARNING, 3 NOTICE, 4 INFO, 5 DEBUG"`

@@ -9,3 +9,9 @@ CrawlInterval = 3600
 [FaceBook]
 Account = "18810572605"
 Password = "4ocjR&SN"
+
+[Redis]
+Address = "127.0.0.1:6379"
+Password = ""
+DB = 3
+Prefix = "fb"
