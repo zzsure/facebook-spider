@@ -44,7 +44,7 @@ func StartBasicCrawlTask(fds []*models.FileData) error {
 			continue
 		}
 		// save post data to file
-		err = savePostDataToFile(pds, fd.URL)
+		err = savePostDataToFile(pds, fd)
 		if err != nil {
 			logger.Error("save url:", fd.URL, ", post data err:", err)
 		}
@@ -55,7 +55,7 @@ func StartBasicCrawlTask(fds []*models.FileData) error {
 			logger.Error("crawl url: ", fd.URL, ", err:", err)
 			continue
 		}
-		err = saveCommentDataToFile(cds, fd.URL)
+		err = saveCommentDataToFile(cds, fd)
 		if err != nil {
 			logger.Error("save url:", fd.URL, ", comment data err:", err)
 		}
@@ -247,7 +247,7 @@ func parseComment(b []byte) ([]*models.CommentData, string, error) {
 }
 
 // save comment data to file
-func saveCommentDataToFile(cds []*models.CommentData, url string) error {
+func saveCommentDataToFile(cds []*models.CommentData, fd *models.FileData) error {
 	cm := make(map[string]string)
 
 	for _, cd := range cds {
@@ -264,7 +264,7 @@ func saveCommentDataToFile(cds []*models.CommentData, url string) error {
 		return nil
 	}
 
-	articleDir, err := util.GetArticleDir(conf.Config.Spider.ArticleBaseDir, url)
+	articleDir, err := util.GetArticleDir(conf.Config.Spider.ArticleBaseDir, fd.Lang, fd.URL)
 	if err != nil {
 		logger.Error("get comments path err:", err)
 		return err
@@ -283,7 +283,7 @@ func saveCommentDataToFile(cds []*models.CommentData, url string) error {
 }
 
 // save article data to file
-func savePostDataToFile(pds []*models.PostData, url string) error {
+func savePostDataToFile(pds []*models.PostData, fd *models.FileData) error {
 	pm := make(map[string]string)
 
 	for _, pd := range pds {
@@ -300,7 +300,7 @@ func savePostDataToFile(pds []*models.PostData, url string) error {
 		return nil
 	}
 
-	postsDir, err := util.GetArticleDir(conf.Config.Spider.ArticleBaseDir, url)
+	postsDir, err := util.GetArticleDir(conf.Config.Spider.ArticleBaseDir, fd.Lang, fd.URL)
 	if err != nil {
 		logger.Error("get posts path err:", err)
 		return err

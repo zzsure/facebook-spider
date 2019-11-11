@@ -172,13 +172,13 @@ func GetCommentFileName(d string) string {
 }
 
 // get article dir
-func GetArticleDir(dir, url string) (string, error) {
+func GetArticleDir(dir, lang, url string) (string, error) {
 	//dir := strings.TrimRight(conf.Config.Spider.ArticleBaseDir, "/")
 	name, err := GetOfficialAccountName(url)
 	if err != nil {
 		return "", err
 	}
-	return path.Join(dir, name), nil
+	return path.Join(dir, lang, name), nil
 	//return fmt.Sprintf("%s%s/%s%s", dir, url, util.GetCurrentDate(), "posts")
 }
 
