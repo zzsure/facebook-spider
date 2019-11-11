@@ -98,7 +98,7 @@ func getPostComments(pds []*models.PostData) ([]*models.CommentData, error) {
 				logger.Error("craw comment url: ", pd.CommentURL, ", err: ", err)
 				continue
 			}*/
-			// TODO: for test
+			// TODO: for test, change recursive crawl
 			html, _ := util.ReadStringFromFile("./data/comment.html")
 
 			cds, err := parseComment([]byte(html))
@@ -199,8 +199,32 @@ func parsePost(b []byte) ([]*models.PostData, string, error) {
 	return rets, moreURL, nil
 }
 
-func parseComment(content []byte) ([]*models.CommentData, error) {
-	return nil, nil
+func parseComment(b []byte) ([]*models.CommentData, error) {
+	doc, err := goquery.NewDocumentFromReader(strings.NewReader(string(b)))
+	if err != nil {
+		return nil, err
+	}
+
+	var cds []*models.CommentData
+	doc.Find("h3").Each(func(i int, s *goquery.Selection) {
+		div := s.Next()
+		comment := div.Text()
+		logger.Info("comment: ", comment)
+		if comment != "" {
+			abbr := div.Parent().Find("abbr")
+			timeStr := abbr.Text()
+			logger.Info("time str: ", timeStr)
+			date := util.GetDateByCellTime(timeStr)
+			logger.Info("date: ", date)
+			cd := &models.CommentData{
+				Date:    date,
+				Comment: comment,
+			}
+			cds = append(cds, cd)
+			logger.Info("\n")
+		}
+	})
+	return cds, nil
 }
 
 // save comment data to file
