@@ -21,6 +21,10 @@ var logger = logging.MustGetLogger("modules/crawler")
 
 // a cron task
 func StartBasicCrawlTask(fds []*models.FileData) error {
+	if len(fds) <= 0 {
+		return errors.New("file data list length should not 0")
+	}
+
 	if !isLogin() {
 		err := login()
 		if err != nil {
@@ -59,9 +63,6 @@ func StartBasicCrawlTask(fds []*models.FileData) error {
 		if err != nil {
 			logger.Error("save url:", fd.URL, ", comment data err:", err)
 		}
-
-		// TODO: need delete
-		break
 	}
 	return nil
 }
@@ -76,22 +77,19 @@ func getPostComments(pds []*models.PostData) ([]*models.CommentData, error) {
 	var acds []*models.CommentData
 	for _, pd := range pds {
 		if pd.CommentURL != "" {
-			/*content, err := crawlByColly(pd.CommentURL)
+			html, err := crawlByColly(pd.CommentURL)
 			if err != nil {
 				logger.Error("craw comment url: ", pd.CommentURL, ", err: ", err)
 				continue
-			}*/
-
+			}
 			// TODO: for test, change recursive crawl
-			html, _ := util.ReadStringFromFile("./data/comment.html")
+			//html, _ := util.ReadStringFromFile("./data/comment.html")
 			cds, err := recursiveCrawlComments([]byte(html))
 			if err != nil {
 				logger.Error("recursive crawl comment err:", err)
+				continue
 			}
 			acds = append(acds, cds...)
-
-			// TODO: need delete
-			break
 		}
 	}
 	return acds, nil
@@ -102,20 +100,23 @@ func recursiveCrawlComments(content []byte) ([]*models.CommentData, error) {
 	if err != nil {
 		return nil, err
 	}
+	if len(cds) <= 0 {
+		return nil, errors.New("not have comments")
+	}
 
 	validDate := util.GetOffsetDateStr(-1 * conf.Config.Spider.RepeatDays)
-	for _, cd := range cds {
-		if cd.Date < validDate {
-			return cds, nil
-		} else if moreURL != "" {
-			content, err := crawlByColly(moreURL)
-			if err != nil {
-				logger.Error("crawl comment more url: ", moreURL, ", err: ", err)
-			}
-			rcds, err := recursiveCrawlComments(content)
-			if err == nil {
-				cds = append(cds, rcds...)
-			}
+	if cds[len(cds)-1].Date < validDate {
+		return cds, nil
+	}
+
+	if moreURL != "" {
+		content, err := crawlByColly(moreURL)
+		if err != nil {
+			logger.Error("crawl comment more url: ", moreURL, ", err: ", err)
+		}
+		rcds, err := recursiveCrawlComments(content)
+		if err == nil {
+			cds = append(cds, rcds...)
 		}
 	}
 
@@ -128,21 +129,24 @@ func recursiveCrawlPost(content []byte) ([]*models.PostData, error) {
 	if err != nil {
 		return nil, err
 	}
+	if len(pds) <= 0 {
+		return nil, errors.New("not have posts")
+	}
 
 	validDate := util.GetOffsetDateStr(-1 * conf.Config.Spider.RepeatDays)
-	for _, pd := range pds {
-		if pd.Date < validDate {
+	if pds[len(pds)-1].Date < validDate {
+		return pds, nil
+	}
+
+	if moreURL != "" {
+		content, err := crawlByColly(moreURL)
+		if err != nil {
+			logger.Error("crawl post more url: ", moreURL, ", err: ", err)
 			return pds, nil
-		} else if moreURL != "" {
-			content, err := crawlByColly(moreURL)
-			if err != nil {
-				logger.Error("crawl post more url: ", moreURL, ", err: ", err)
-				return pds, nil
-			}
-			rpds, err := recursiveCrawlPost(content)
-			if err == nil {
-				pds = append(pds, rpds...)
-			}
+		}
+		rpds, err := recursiveCrawlPost(content)
+		if err == nil {
+			pds = append(pds, rpds...)
 		}
 	}
 
