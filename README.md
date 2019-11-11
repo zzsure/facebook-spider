@@ -11,3 +11,6 @@ crawl facebook article spider using go language
 - 抓取post，更多的问题，递归调用
 - 抓取comment，更多，递归
 - 随机refer，随机user-agent，随机事件抓取
+- facebook的时间格式化
+- 评论的回复抓取
+- 定时任务

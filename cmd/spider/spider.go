@@ -2,6 +2,7 @@ package spider
 
 import (
 	"github.com/op/go-logging"
+	"github.com/robfig/cron"
 	"github.com/urfave/cli"
 	"gitlab.azbit.cn/web/facebook-spider/conf"
 	"gitlab.azbit.cn/web/facebook-spider/library/log"
@@ -44,9 +45,11 @@ func run(c *cli.Context) {
 	}
 
 	// start a crawl cron task
-	//crawler.StartCrawlTask(fds)
-	err = crawler.StartBasicCrawlTask(fds)
-	if err != nil {
-		logger.Error("crawl err:", err)
-	}
+	cc := cron.New()
+	cc.AddFunc("0 6 * * *", func() {
+		err = crawler.StartBasicCrawlTask(fds)
+		if err != nil {
+			logger.Error("crawl err:", err)
+		}
+	})
 }

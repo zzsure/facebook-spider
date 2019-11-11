@@ -184,11 +184,22 @@ func GetArticleDir(dir, lang, url string) (string, error) {
 
 // get date by facebook cell time
 func GetDateByCellTime(cellTime string) string {
-	// 1 sec - 59 secs, 1 min - 59 mins, 1 hr - 23 hrs, Yesterday at 12:28 PM, October 29 at 11:33 PM
+	// 1 sec - 59 secs, 1 min - 59 mins, 1 hr - 23 hrs, Yesterday at 12:28 PM, October 29 at 11:33 PM, December 8, 2017 at 6:59 PM
+	// parse time err: parsing time "2019 Today at 3:22 AM" as "2006 January 2 at 3:4 PM": cannot parse "Today at 3:22 AM" as "January"
 	date := GetCurrentDate()
 
-	if strings.Contains(cellTime, "Yesterday") {
+	if strings.Contains(cellTime, "Today") {
+		date = GetCurrentDate()
+	} else if strings.Contains(cellTime, "Yesterday") {
 		date = GetOffsetDateStr(-1)
+	} else if strings.Contains(cellTime, ",") {
+		loc, _ := time.LoadLocation(consts.TIME_ZONE)
+		t, err := time.ParseInLocation("January 2, 2006 at 3:4 PM", cellTime, loc)
+		if err == nil {
+			date = fmt.Sprintf("%v", t.In(loc).Format("20060102"))
+		} else {
+			fmt.Println("parse time err:", err.Error())
+		}
 	} else if strings.Contains(cellTime, "at") {
 		loc, _ := time.LoadLocation(consts.TIME_ZONE)
 		tmp := GetCurrentYear() + " " + cellTime
