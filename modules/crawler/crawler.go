@@ -430,18 +430,18 @@ func StartBasicCrawlTaskTest(fds []*models.FileData) error {
 	logger.Info("show more url: ", moreURL)
 
 	// save article data to file
-	err = savePostDataToFile(pds, "https://www.facebook.com/Vogue/")
+	err = savePostDataToFile(pds, fds[0])
 	if err != nil {
 		logger.Error("save article data err:", err)
 	}
 
 	cds, err := getPostComments(pds)
 	if err != nil {
-		logger.Error("crawl url: ", "https://www.facebook.com/Vogue/", ", err:", err)
+		logger.Error("crawl url: ", fds[0].URL, ", err:", err)
 	}
-	err = saveCommentDataToFile(cds, "https://www.facebook.com/Vogue/")
+	err = saveCommentDataToFile(cds, fds[0])
 	if err != nil {
-		logger.Error("save url:", "https://www.facebook.com/Vogue/", ", comment data err:", err)
+		logger.Error("save url:", fds[0].URL, ", comment data err:", err)
 	}
 
 	return nil
