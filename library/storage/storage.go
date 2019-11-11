@@ -18,6 +18,6 @@ func Init() {
 	c := colly.NewCollector()
 	err := c.SetStorage(StorageIns)
 	if err != nil {
-		//panic(err)
+		panic(err)
 	}
 }
