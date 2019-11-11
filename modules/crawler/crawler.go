@@ -21,23 +21,6 @@ var logger = logging.MustGetLogger("modules/crawler")
 
 // a cron task
 func StartBasicCrawlTask(fds []*models.FileData) error {
-	// TODO: for test
-	html, _ := util.ReadStringFromFile("./data/vogue.html")
-	pds, moreURL, err := parsePost([]byte(html))
-	logger.Info("show more url: ", moreURL)
-
-	// save article data to file
-	err = savePostDataToFile(pds, "https://www.facebook.com/Vogue/")
-	if err != nil {
-		logger.Error("save article data err:", err)
-	}
-
-	_, err = getPostComments(pds)
-	return nil
-}
-
-// a cron task
-func StartBasicCrawlTask1(fds []*models.FileData) error {
 	if !isLogin() {
 		err := login()
 		if err != nil {
@@ -98,15 +81,13 @@ func getPostComments(pds []*models.PostData) ([]*models.CommentData, error) {
 				logger.Error("craw comment url: ", pd.CommentURL, ", err: ", err)
 				continue
 			}*/
+
 			// TODO: for test, change recursive crawl
 			html, _ := util.ReadStringFromFile("./data/comment.html")
-
-			cds, err := parseComment([]byte(html))
+			cds, err := recursiveCrawlComments([]byte(html))
 			if err != nil {
-				logger.Error("parse comment err:", err)
-				continue
+				logger.Error("recursive crawl comment err:", err)
 			}
-
 			acds = append(acds, cds...)
 
 			// TODO: need delete
@@ -114,6 +95,31 @@ func getPostComments(pds []*models.PostData) ([]*models.CommentData, error) {
 		}
 	}
 	return acds, nil
+}
+
+func recursiveCrawlComments(content []byte) ([]*models.CommentData, error) {
+	cds, moreURL, err := parseComment(content)
+	if err != nil {
+		return nil, err
+	}
+
+	validDate := util.GetOffsetDateStr(-1 * conf.Config.Spider.RepeatDays)
+	for _, cd := range cds {
+		if cd.Date < validDate {
+			return cds, nil
+		} else if moreURL != "" {
+			content, err := crawlByColly(moreURL)
+			if err != nil {
+				logger.Error("crawl comment more url: ", moreURL, ", err: ", err)
+			}
+			rcds, err := recursiveCrawlComments(content)
+			if err == nil {
+				cds = append(cds, rcds...)
+			}
+		}
+	}
+
+	return cds, nil
 }
 
 func recursiveCrawlPost(content []byte) ([]*models.PostData, error) {
@@ -127,10 +133,10 @@ func recursiveCrawlPost(content []byte) ([]*models.PostData, error) {
 	for _, pd := range pds {
 		if pd.Date < validDate {
 			return pds, nil
-		} else {
+		} else if moreURL != "" {
 			content, err := crawlByColly(moreURL)
 			if err != nil {
-				logger.Error("crawl more url: ", moreURL, ", err: ", err)
+				logger.Error("crawl post more url: ", moreURL, ", err: ", err)
 				return pds, nil
 			}
 			rpds, err := recursiveCrawlPost(content)
@@ -140,7 +146,7 @@ func recursiveCrawlPost(content []byte) ([]*models.PostData, error) {
 		}
 	}
 
-	return pds, err
+	return pds, nil
 }
 
 func parsePost(b []byte) ([]*models.PostData, string, error) {
@@ -199,32 +205,45 @@ func parsePost(b []byte) ([]*models.PostData, string, error) {
 	return rets, moreURL, nil
 }
 
-func parseComment(b []byte) ([]*models.CommentData, error) {
+func parseComment(b []byte) ([]*models.CommentData, string, error) {
 	doc, err := goquery.NewDocumentFromReader(strings.NewReader(string(b)))
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 
 	var cds []*models.CommentData
 	doc.Find("h3").Each(func(i int, s *goquery.Selection) {
-		div := s.Next()
-		comment := div.Text()
-		logger.Info("comment: ", comment)
-		if comment != "" {
-			abbr := div.Parent().Find("abbr")
-			timeStr := abbr.Text()
-			logger.Info("time str: ", timeStr)
-			date := util.GetDateByCellTime(timeStr)
-			logger.Info("date: ", date)
-			cd := &models.CommentData{
-				Date:    date,
-				Comment: comment,
+		ppDiv := s.Parent().Parent()
+		ppID, exits := ppDiv.Attr("id")
+		if exits && util.IsAllNumber(ppID) {
+			div := s.Next()
+			comment := div.Text()
+			logger.Info("comment: ", comment)
+			if comment != "" {
+				abbr := div.Parent().Find("abbr")
+				timeStr := abbr.Text()
+				logger.Info("time str: ", timeStr)
+				date := util.GetDateByCellTime(timeStr)
+				logger.Info("date: ", date)
+				cd := &models.CommentData{
+					Date:    date,
+					Comment: comment,
+				}
+				cds = append(cds, cd)
+				logger.Info("\n")
 			}
-			cds = append(cds, cd)
-			logger.Info("\n")
 		}
 	})
-	return cds, nil
+
+	var moreURL string
+	moreA := doc.Find("div a")
+	if moreA.Find("img").Text() != "" {
+		moreURL, exits := moreA.Attr("href")
+		if exits && moreURL != "" {
+			moreURL = fmt.Sprintf("%s%s", strings.TrimRight(consts.BASIC_HTTPS_FACEBOOK_DOMAIN, "/"), moreURL)
+		}
+	}
+	return cds, moreURL, nil
 }
 
 // save comment data to file
@@ -236,7 +255,7 @@ func saveCommentDataToFile(cds []*models.CommentData, url string) error {
 			cm[cd.Date] += "\n"
 		}
 		if cd.Comment != "" {
-			cm[cd.Date] += cd.Comment
+			cm[cd.Date] += cd.Comment + "\n"
 		}
 	}
 
@@ -247,7 +266,7 @@ func saveCommentDataToFile(cds []*models.CommentData, url string) error {
 
 	articleDir, err := util.GetArticleDir(conf.Config.Spider.ArticleBaseDir, url)
 	if err != nil {
-		logger.Error("get posts path err:", err)
+		logger.Error("get comments path err:", err)
 		return err
 	}
 
@@ -255,7 +274,7 @@ func saveCommentDataToFile(cds []*models.CommentData, url string) error {
 	for k, v := range cm {
 		err = util.SaveStringToFile(articleDir, util.GetCommentFileName(k), v)
 		if err != nil {
-			logger.Error("save ", k, " posts err:", err)
+			logger.Error("save ", k, " comment err:", err)
 			continue
 		}
 	}
@@ -401,4 +420,29 @@ func login() error {
 	}
 
 	return err
+}
+
+// a cron task
+func StartBasicCrawlTaskTest(fds []*models.FileData) error {
+	// TODO: for test
+	html, _ := util.ReadStringFromFile("./data/vogue.html")
+	pds, moreURL, err := parsePost([]byte(html))
+	logger.Info("show more url: ", moreURL)
+
+	// save article data to file
+	err = savePostDataToFile(pds, "https://www.facebook.com/Vogue/")
+	if err != nil {
+		logger.Error("save article data err:", err)
+	}
+
+	cds, err := getPostComments(pds)
+	if err != nil {
+		logger.Error("crawl url: ", "https://www.facebook.com/Vogue/", ", err:", err)
+	}
+	err = saveCommentDataToFile(cds, "https://www.facebook.com/Vogue/")
+	if err != nil {
+		logger.Error("save url:", "https://www.facebook.com/Vogue/", ", comment data err:", err)
+	}
+
+	return nil
 }
