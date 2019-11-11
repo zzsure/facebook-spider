@@ -2,7 +2,7 @@
 Type = "raw"
 
 [Spider]
-CsvPath = "./data/urls.csv"
+CsvPath = "./asset/urls.csv"
 ArticleBaseDir = "./data/"
 CrawlInterval = 3600
 RepeatDays = 7
