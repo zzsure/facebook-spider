@@ -225,7 +225,7 @@ func parsePost(b []byte) ([]*models.PostData, string, error) {
 		rets = append(rets, ad)
 	})
 
-	doc.Find(".i a").Each(func(i int, s *goquery.Selection) {
+	doc.Find("div a").Each(func(i int, s *goquery.Selection) {
 		if strings.Contains(s.Text(), "Show more") {
 			moreURL, _ = s.Attr("href")
 			if moreURL != "" {
