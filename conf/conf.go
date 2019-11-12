@@ -11,8 +11,8 @@ type ConfigTOML struct {
 		ArticleBaseDir string `required:"true" flagUsage:"存储抓取文章存储的目录"`
 		CrawlInterval  int    `required:"true" default:"3600" flagUsage:"需要隔多长时间抓取一次"`
 		RepeatDays     int    `required:"true" default:"7" flagUsage:"需要抓几天前的"`
-		StartHour      int    `required:"true" default:"6" flagUsage:"每天的几小时开始抓取"`
-		StartMin       int    `required:"true" default:"0" flagUsage:"每天的几分开始抓取"`
+		StartHour      int    `default:"6" flagUsage:"每天的几小时开始抓取"`
+		StartMin       int    `default:"0" flagUsage:"每天的几分开始抓取"`
 	}
 
 	FaceBook struct {
