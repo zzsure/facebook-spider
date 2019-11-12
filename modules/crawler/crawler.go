@@ -30,11 +30,17 @@ func StartBasicCrawlTask(fds []*models.FileData) error {
 		err = login(consts.LOGIN_CHECK_URL)
 	} else {
 		url := util.GetMobilePostURL(fds[0].URL)
+        logger.Info("visit url", url)
 		content, err := crawlByColly(url)
 		if err != nil {
 			return err
 		}
-		util.SaveStringToFile(conf.Config.Spider.ArticleBaseDir, "crawl.html", string(content))
+        logger.Info("content", string(content))
+        err = util.SaveStringToFile(conf.Config.Spider.ArticleBaseDir, "crawl.html", string(content))
+        if err != nil {
+            return err
+        }
+
 		doc, err := goquery.NewDocumentFromReader(strings.NewReader(string(content)))
 		if err != nil {
 			return err
@@ -438,7 +444,7 @@ func crawlByColly(url string) ([]byte, error) {
 	c.OnRequest(func(r *colly.Request) {
 		r.Headers.Set("Host", "facebook.com")
 		r.Headers.Set("Connection", "keep-alive")
-		r.Headers.Set("Accept-Language", "en-US,en;q=0.8")
+		r.Headers.Set("Accept-Language", "en-US,en;q=0.9")
 		r.ResponseCharacterEncoding = "utf-8"
 	})
 
@@ -466,6 +472,12 @@ func crawlByColly(url string) ([]byte, error) {
 func isLogin() bool {
 	c := colly.NewCollector()
 	_ = c.SetStorage(storage.StorageIns)
+    c.OnRequest(func(r *colly.Request) {
+		r.Headers.Set("Host", "facebook.com")
+		r.Headers.Set("Connection", "keep-alive")
+		r.Headers.Set("Accept-Language", "en-US,en;q=0.9")
+		r.ResponseCharacterEncoding = "utf-8"
+	})
 	for _, cookie := range c.Cookies(consts.LOGIN_CHECK_URL) {
 		logger.Info("cookie:", cookie.String())
 		if strings.Contains(cookie.String(), "c_user") {
@@ -486,7 +498,7 @@ func login(url string) error {
 	c.OnRequest(func(r *colly.Request) {
 		r.Headers.Set("Host", "facebook.com")
 		r.Headers.Set("Connection", "keep-alive")
-		r.Headers.Set("Accept-Language", "en-US,en;q=0.8")
+		r.Headers.Set("Accept-Language", "en-US,en;q=0.9")
 		r.ResponseCharacterEncoding = "utf-8"
 	})
 
