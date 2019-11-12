@@ -25,11 +25,31 @@ func StartBasicCrawlTask(fds []*models.FileData) error {
 		return errors.New("file data list length should not 0")
 	}
 
+	var err error
 	if !isLogin() {
-		err := login()
+		err = login(consts.LOGIN_CHECK_URL)
+	} else {
+		url := util.GetMobilePostURL(fds[0].URL)
+		content, err := crawlByColly(url)
 		if err != nil {
 			return err
 		}
+		doc, err := goquery.NewDocumentFromReader(strings.NewReader(string(content)))
+		if err != nil {
+			return err
+		}
+		doc.Find("div a").Each(func(i int, s *goquery.Selection) {
+			if strings.Contains(s.Text(), "Log In") {
+				loginURL, exits := s.Attr("href")
+				if !exits || loginURL == "" {
+					loginURL = consts.LOGIN_CHECK_URL
+				}
+				err = login(loginURL)
+			}
+		})
+	}
+	if err != nil {
+		return err
 	}
 
 	for _, fd := range fds {
@@ -189,6 +209,7 @@ func parsePost(b []byte) ([]*models.PostData, string, error) {
 	if err != nil {
 		return nil, "", err
 	}
+
 	doc.Find("div[role=article]").Each(func(i int, s *goquery.Selection) {
 		post := ""
 		s.Find("span p").Each(func(i int, s *goquery.Selection) {
@@ -456,7 +477,7 @@ func isLogin() bool {
 }
 
 // log in mbasic facebook
-func login() error {
+func login(url string) error {
 	c := colly.NewCollector()
 	_ = c.SetStorage(storage.StorageIns)
 	extensions.RandomUserAgent(c)
@@ -500,7 +521,7 @@ func login() error {
 		err = errHttp
 	})
 
-	errVisit := c.Visit(consts.LOGIN_CHECK_URL)
+	errVisit := c.Visit(url)
 	if errVisit != nil {
 		return errVisit
 	}
