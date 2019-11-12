@@ -45,6 +45,7 @@ func run(c *cli.Context) {
 		logger.Error("read data from csv file err:", err)
 		panic(err)
 	}
+	//crawler.StartBasicCrawlTaskTest(fds)
 
 	// start a crawl cron task
 	cc := cron.New()
