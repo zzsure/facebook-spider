@@ -68,7 +68,7 @@ func StartBasicCrawlTask(fds []*models.FileData) error {
 }
 
 func crawlSleep() {
-	rs := rand.Intn(consts.MAX_SLEEP_TIME)
+	rs := rand.Intn(conf.Config.Spider.CrawlMaxSleep)
 	logger.Info("random post sleep seconds:", rs)
 	time.Sleep(time.Duration(rs) * time.Second)
 }
