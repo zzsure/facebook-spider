@@ -14,3 +14,4 @@ crawl facebook article spider using go language
 - facebook的时间格式化
 - 评论的回复抓取
 - 定时任务
+- 国际化

@@ -68,7 +68,7 @@ func StartBasicCrawlTask(fds []*models.FileData) error {
 		}
 
 		// crawl valid date post
-		pds, err := recursiveCrawlPost(content)
+		pds, err := recursiveCrawlPost(content, 0)
 		if err != nil {
 			logger.Error("crawl url: ", fd.URL, ", err:", err)
 			continue
@@ -110,7 +110,7 @@ func getPostComments(pds []*models.PostData) ([]*models.CommentData, error) {
 			}
 			// TODO: for test, change recursive crawl
 			//html, _ := util.ReadStringFromFile("./data/comment.html")
-			cds, err := recursiveCrawlComments([]byte(html))
+			cds, err := recursiveCrawlComments([]byte(html), 0)
 			if err != nil {
 				logger.Error("recursive crawl comment err:", err)
 				continue
@@ -121,7 +121,7 @@ func getPostComments(pds []*models.PostData) ([]*models.CommentData, error) {
 	return acds, nil
 }
 
-func recursiveCrawlComments(content []byte) ([]*models.CommentData, error) {
+func recursiveCrawlComments(content []byte, depth int) ([]*models.CommentData, error) {
 	cds, moreURL, err := parseComment(content)
 	if err != nil {
 		return nil, err
@@ -131,7 +131,7 @@ func recursiveCrawlComments(content []byte) ([]*models.CommentData, error) {
 	}
 
 	validDate := util.GetOffsetDateStr(-1 * conf.Config.Spider.RepeatDays)
-	if cds[len(cds)-1].Date < validDate {
+	if cds[len(cds)-1].Date < validDate || depth > conf.Config.Spider.RecusiveMaxCount {
 		return cds, nil
 	}
 
@@ -140,7 +140,7 @@ func recursiveCrawlComments(content []byte) ([]*models.CommentData, error) {
 		if err != nil {
 			logger.Error("crawl comment more url: ", moreURL, ", err: ", err)
 		}
-		rcds, err := recursiveCrawlComments(content)
+		rcds, err := recursiveCrawlComments(content, depth+1)
 		if err == nil {
 			cds = append(cds, rcds...)
 		}
@@ -149,7 +149,7 @@ func recursiveCrawlComments(content []byte) ([]*models.CommentData, error) {
 	return cds, nil
 }
 
-func recursiveCrawlPost(content []byte) ([]*models.PostData, error) {
+func recursiveCrawlPost(content []byte, depth int) ([]*models.PostData, error) {
 	pds, moreURL, err := parsePost(content)
 	logger.Info("more url:", string(moreURL))
 	if err != nil {
@@ -160,7 +160,7 @@ func recursiveCrawlPost(content []byte) ([]*models.PostData, error) {
 	}
 
 	validDate := util.GetOffsetDateStr(-1 * conf.Config.Spider.RepeatDays)
-	if pds[len(pds)-1].Date < validDate {
+	if pds[len(pds)-1].Date < validDate || depth > conf.Config.Spider.RecusiveMaxCount {
 		return pds, nil
 	}
 
@@ -170,7 +170,7 @@ func recursiveCrawlPost(content []byte) ([]*models.PostData, error) {
 			logger.Error("crawl post more url: ", moreURL, ", err: ", err)
 			return pds, nil
 		}
-		rpds, err := recursiveCrawlPost(content)
+		rpds, err := recursiveCrawlPost(content, depth+1)
 		if err == nil {
 			pds = append(pds, rpds...)
 		}
@@ -179,7 +179,7 @@ func recursiveCrawlPost(content []byte) ([]*models.PostData, error) {
 	return pds, nil
 }
 
-func recursiveCrawlReply(content []byte) ([]*models.CommentData, error) {
+func recursiveCrawlReply(content []byte, depth int) ([]*models.CommentData, error) {
 	cds, moreURL, err := parseReply(content)
 	if err != nil {
 		return nil, err
@@ -189,7 +189,7 @@ func recursiveCrawlReply(content []byte) ([]*models.CommentData, error) {
 	}
 
 	validDate := util.GetOffsetDateStr(-1 * conf.Config.Spider.RepeatDays)
-	if cds[len(cds)-1].Date < validDate {
+	if cds[len(cds)-1].Date < validDate || depth > conf.Config.Spider.RecusiveMaxCount {
 		return cds, nil
 	}
 
@@ -198,7 +198,7 @@ func recursiveCrawlReply(content []byte) ([]*models.CommentData, error) {
 		if err != nil {
 			logger.Error("crawl reply more url: ", moreURL, ", err: ", err)
 		}
-		rcds, err := recursiveCrawlComments(content)
+		rcds, err := recursiveCrawlReply(content, depth+1)
 		if err == nil {
 			cds = append(cds, rcds...)
 		}
@@ -300,7 +300,7 @@ func parseComment(b []byte) ([]*models.CommentData, string, error) {
 					replyURL := fmt.Sprintf("%s%s", strings.TrimRight(consts.BASIC_HTTPS_FACEBOOK_DOMAIN, "/"), replyURL)
 					content, err := crawlByColly(replyURL)
 					if err == nil {
-						rcds, err := recursiveCrawlReply(content)
+						rcds, err := recursiveCrawlReply(content, 0)
 						if err == nil {
 							cds = append(cds, rcds...)
 						}

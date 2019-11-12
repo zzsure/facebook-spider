@@ -7,12 +7,13 @@ import (
 
 type ConfigTOML struct {
 	Spider struct {
-		CsvPath        string `required:"true" flagUsage:"需要抓取facebook公众号的地址文件"`
-		ArticleBaseDir string `required:"true" flagUsage:"存储抓取文章存储的目录"`
-		CrawlMaxSleep  int    `required:"true" default:"60" flagUsage:"需要最多隔多长时间抓取一次"`
-		RepeatDays     int    `required:"true" default:"7" flagUsage:"需要抓几天前的"`
-		StartHour      int    `default:"6" flagUsage:"每天的几小时开始抓取"`
-		StartMin       int    `default:"0" flagUsage:"每天的几分开始抓取"`
+		CsvPath          string `required:"true" flagUsage:"需要抓取facebook公众号的地址文件"`
+		ArticleBaseDir   string `required:"true" flagUsage:"存储抓取文章存储的目录"`
+		CrawlMaxSleep    int    `required:"true" default:"60" flagUsage:"需要最多隔多长时间抓取一次"`
+		RepeatDays       int    `required:"true" default:"7" flagUsage:"需要抓几天前的"`
+		StartHour        int    `default:"6" flagUsage:"每天的几小时开始抓取"`
+		StartMin         int    `default:"0" flagUsage:"每天的几分开始抓取"`
+		RecusiveMaxCount int    `default:"100" flagUsage:"最多递归多少次"`
 	}
 
 	FaceBook struct {
