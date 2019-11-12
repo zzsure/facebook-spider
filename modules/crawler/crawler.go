@@ -30,16 +30,15 @@ func StartBasicCrawlTask(fds []*models.FileData) error {
 		err = login(consts.LOGIN_CHECK_URL)
 	} else {
 		url := util.GetMobilePostURL(fds[0].URL)
-        logger.Info("visit url", url)
+		logger.Info("visit url", url)
 		content, err := crawlByColly(url)
 		if err != nil {
 			return err
 		}
-        logger.Info("content", string(content))
-        err = util.SaveStringToFile(conf.Config.Spider.ArticleBaseDir, "crawl.html", string(content))
-        if err != nil {
-            return err
-        }
+		err = util.SaveStringToFile(conf.Config.Spider.ArticleBaseDir, "crawl.html", string(content))
+		if err != nil {
+			return err
+		}
 
 		doc, err := goquery.NewDocumentFromReader(strings.NewReader(string(content)))
 		if err != nil {
@@ -472,7 +471,7 @@ func crawlByColly(url string) ([]byte, error) {
 func isLogin() bool {
 	c := colly.NewCollector()
 	_ = c.SetStorage(storage.StorageIns)
-    c.OnRequest(func(r *colly.Request) {
+	c.OnRequest(func(r *colly.Request) {
 		r.Headers.Set("Host", "facebook.com")
 		r.Headers.Set("Connection", "keep-alive")
 		r.Headers.Set("Accept-Language", "en-US,en;q=0.9")

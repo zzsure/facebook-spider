@@ -187,6 +187,8 @@ func GetDateByCellTime(cellTime string) string {
 	// 1 sec - 59 secs, 1 min - 59 mins, 1 hr - 23 hrs, Yesterday at 12:28 PM, October 29 at 11:33 PM, December 8, 2017 at 6:59 PM
 	// parse time err: parsing time "2019 Today at 3:22 AM" as "2006 January 2 at 3:4 PM": cannot parse "Today at 3:22 AM" as "January"
 	date := GetCurrentDate()
+	cellTime = strings.Replace(cellTime, "小时", "hrs", -1)
+	cellTime = strings.Replace(cellTime, "分钟", "mins", -1)
 
 	if strings.Contains(cellTime, "Today") {
 		date = GetCurrentDate()
