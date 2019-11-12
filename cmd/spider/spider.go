@@ -49,6 +49,7 @@ func run(c *cli.Context) {
 	// start a crawl cron task
 	cc := cron.New()
 	str := fmt.Sprintf("%d %d * * *", conf.Config.Spider.StartMin, conf.Config.Spider.StartHour)
+	logger.Info("set cron str: ", str)
 	_, _ = cc.AddFunc(str, func() {
 		logger.Info("exec crawl cron unix time:", time.Now().Unix())
 		err = crawler.StartBasicCrawlTask(fds)
