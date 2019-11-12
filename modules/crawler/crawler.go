@@ -471,6 +471,7 @@ func crawlByColly(url string) ([]byte, error) {
 func isLogin() bool {
 	c := colly.NewCollector()
 	_ = c.SetStorage(storage.StorageIns)
+	c.AllowURLRevisit = true
 	c.OnRequest(func(r *colly.Request) {
 		r.Headers.Set("Host", "facebook.com")
 		r.Headers.Set("Connection", "keep-alive")
@@ -494,6 +495,7 @@ func login(url string) error {
 	_ = c.SetStorage(storage.StorageIns)
 	extensions.RandomUserAgent(c)
 	extensions.Referer(c)
+	c.AllowURLRevisit = true
 	c.OnRequest(func(r *colly.Request) {
 		r.Headers.Set("Host", "facebook.com")
 		r.Headers.Set("Connection", "keep-alive")
