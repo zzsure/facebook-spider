@@ -35,10 +35,6 @@ func StartBasicCrawlTask(fds []*models.FileData) error {
 		if err != nil {
 			return err
 		}
-		err = util.SaveStringToFile(conf.Config.Spider.ArticleBaseDir, "crawl.html", string(content))
-		if err != nil {
-			return err
-		}
 
 		doc, err := goquery.NewDocumentFromReader(strings.NewReader(string(content)))
 		if err != nil {
@@ -452,6 +448,7 @@ func crawlByColly(url string) ([]byte, error) {
 
 	c.OnResponse(func(resp *colly.Response) {
 		content = resp.Body
+		_ = util.SaveStringToFile(conf.Config.Spider.ArticleBaseDir, "crawl.html", string(content))
 		//logger.Info("crawl:", string(resp.Body))
 	})
 
