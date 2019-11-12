@@ -153,6 +153,34 @@ func recursiveCrawlPost(content []byte) ([]*models.PostData, error) {
 	return pds, nil
 }
 
+func recursiveCrawlReply(content []byte) ([]*models.CommentData, error) {
+	cds, moreURL, err := parseReply(content)
+	if err != nil {
+		return nil, err
+	}
+	if len(cds) <= 0 {
+		return nil, errors.New("not have reply")
+	}
+
+	validDate := util.GetOffsetDateStr(-1 * conf.Config.Spider.RepeatDays)
+	if cds[len(cds)-1].Date < validDate {
+		return cds, nil
+	}
+
+	if moreURL != "" {
+		content, err := crawlByColly(moreURL)
+		if err != nil {
+			logger.Error("crawl reply more url: ", moreURL, ", err: ", err)
+		}
+		rcds, err := recursiveCrawlComments(content)
+		if err == nil {
+			cds = append(cds, rcds...)
+		}
+	}
+
+	return cds, nil
+}
+
 func parsePost(b []byte) ([]*models.PostData, string, error) {
 	var rets []*models.PostData
 	var moreURL string
@@ -237,6 +265,22 @@ func parseComment(b []byte) ([]*models.CommentData, string, error) {
 				logger.Info("\n")
 			}
 		}
+		ppDiv.Find("div").Each(func(i int, s *goquery.Selection) {
+			replyDiv, exits := s.Attr("id")
+			if exits && strings.Contains(replyDiv, "comment_replies") {
+				replyURL, exists := s.Find("a").Attr("href")
+				if exists && replyURL != "" {
+					replyURL := fmt.Sprintf("%s%s", strings.TrimRight(consts.BASIC_HTTPS_FACEBOOK_DOMAIN, "/"), replyURL)
+					content, err := crawlByColly(replyURL)
+					if err == nil {
+						rcds, err := recursiveCrawlReply(content)
+						if err == nil {
+							cds = append(cds, rcds...)
+						}
+					}
+				}
+			}
+		})
 	})
 
 	var moreURL string
@@ -246,6 +290,44 @@ func parseComment(b []byte) ([]*models.CommentData, string, error) {
 		if exits && moreURL != "" {
 			moreURL = fmt.Sprintf("%s%s", strings.TrimRight(consts.BASIC_HTTPS_FACEBOOK_DOMAIN, "/"), moreURL)
 		}
+	}
+	return cds, moreURL, nil
+}
+
+func parseReply(b []byte) ([]*models.CommentData, string, error) {
+	doc, err := goquery.NewDocumentFromReader(strings.NewReader(string(b)))
+	if err != nil {
+		return nil, "", err
+	}
+
+	var cds []*models.CommentData
+	doc.Find("h3").Each(func(i int, s *goquery.Selection) {
+		ppDiv := s.Parent().Parent()
+		ppID, exits := ppDiv.Attr("id")
+		if exits && util.IsAllNumber(ppID) {
+			div := s.Next()
+			comment := div.Text()
+			logger.Info("comment: ", comment)
+			if comment != "" {
+				abbr := div.Parent().Find("abbr")
+				timeStr := abbr.Text()
+				logger.Info("time str: ", timeStr)
+				date := util.GetDateByCellTime(timeStr)
+				logger.Info("date: ", date)
+				cd := &models.CommentData{
+					Date:    date,
+					Comment: comment,
+				}
+				cds = append(cds, cd)
+				logger.Info("\n")
+			}
+		}
+	})
+	var moreURL string
+	moreA := doc.Find("div a")
+	moreURL, exits := moreA.Attr("href")
+	if exits && moreURL != "" {
+		moreURL = fmt.Sprintf("%s%s", strings.TrimRight(consts.BASIC_HTTPS_FACEBOOK_DOMAIN, "/"), moreURL)
 	}
 	return cds, moreURL, nil
 }

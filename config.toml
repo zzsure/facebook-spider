@@ -8,8 +8,8 @@ CrawlInterval = 3600
 RepeatDays = 7
 
 [FaceBook]
-Account = "18810572605"
-Password = "4ocjR&SN"
+Account = "zaitsu.yuya@nlptech.com"
+Password = "lixiaodanlp"
 
 [Redis]
 Address = "127.0.0.1:6379"
