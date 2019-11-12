@@ -34,6 +34,7 @@ func StartBasicCrawlTask(fds []*models.FileData) error {
 		if err != nil {
 			return err
 		}
+		util.SaveStringToFile(conf.Config.Spider.ArticleBaseDir, "crawl.html", string(content))
 		doc, err := goquery.NewDocumentFromReader(strings.NewReader(string(content)))
 		if err != nil {
 			return err
