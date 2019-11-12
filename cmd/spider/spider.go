@@ -46,6 +46,11 @@ func run(c *cli.Context) {
 		panic(err)
 	}
 	//crawler.StartBasicCrawlTaskTest(fds)
+    
+    err = crawler.StartBasicCrawlTask(fds)
+    if err != nil {
+        logger.Error("crawl err:", err)
+    }
 
 	// start a crawl cron task
 	cc := cron.New()
