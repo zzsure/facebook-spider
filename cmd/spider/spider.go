@@ -52,4 +52,10 @@ func run(c *cli.Context) {
 			logger.Error("crawl err:", err)
 		}
 	})
+    cc.AddFunc("*/1 * * * *", func() {
+        logger.Info("check alive....run 1 min cron")
+    })
+    cc.Start()
+
+    select{}
 }
