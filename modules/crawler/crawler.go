@@ -40,7 +40,7 @@ func StartBasicCrawlTask(fds []*models.FileData) error {
 			return err
 		}
 		doc.Find("div a").Each(func(i int, s *goquery.Selection) {
-			if strings.Contains(s.Text(), "Log In") {
+			if strings.Contains(s.Text(), "Log In") || strings.Contains(s.Text(), "登录") {
 				loginURL, exits := s.Attr("href")
 				if !exits || loginURL == "" {
 					loginURL = consts.LOGIN_CHECK_URL
@@ -226,7 +226,7 @@ func parsePost(b []byte) ([]*models.PostData, string, error) {
 
 		var commentURL string
 		s.Find("a").Each(func(i int, s *goquery.Selection) {
-			if strings.Contains(s.Text(), "Comment") {
+			if strings.Contains(s.Text(), "Comment") || strings.Contains(s.Text(), "评论") {
 				if util.IsContainNumber(s.Text()) {
 					commentURL, _ = s.Attr("href")
 					if commentURL != "" {
@@ -248,7 +248,7 @@ func parsePost(b []byte) ([]*models.PostData, string, error) {
 	})
 
 	doc.Find("div a").Each(func(i int, s *goquery.Selection) {
-		if strings.Contains(s.Text(), "Show more") {
+		if strings.Contains(s.Text(), "Show more") || strings.Contains(s.Text(), "更多") {
 			moreURL, _ = s.Attr("href")
 			if moreURL != "" {
 				moreURL = fmt.Sprintf("%s%s", strings.TrimRight(consts.BASIC_HTTPS_FACEBOOK_DOMAIN, "/"), moreURL)
