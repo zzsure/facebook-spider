@@ -6,6 +6,8 @@ CsvPath = "./asset/urls.csv"
 ArticleBaseDir = "./data/"
 CrawlInterval = 3600
 RepeatDays = 7
+StartHour = 6
+StartMin = 0
 
 [FaceBook]
 Account = "zaitsu.yuya@nlptech.com"

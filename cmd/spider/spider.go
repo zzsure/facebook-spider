@@ -1,6 +1,7 @@
 package spider
 
 import (
+	"fmt"
 	"github.com/op/go-logging"
 	"github.com/robfig/cron"
 	"github.com/urfave/cli"
@@ -9,6 +10,7 @@ import (
 	"gitlab.azbit.cn/web/facebook-spider/library/storage"
 	"gitlab.azbit.cn/web/facebook-spider/library/util"
 	"gitlab.azbit.cn/web/facebook-spider/modules/crawler"
+	"time"
 )
 
 var Spider = cli.Command{
@@ -46,16 +48,19 @@ func run(c *cli.Context) {
 
 	// start a crawl cron task
 	cc := cron.New()
-	cc.AddFunc("0 6 * * *", func() {
+	str := fmt.Sprintf("%d %d * * *", conf.Config.Spider.StartHour, conf.Config.Spider.StartMin)
+	_, _ = cc.AddFunc(str, func() {
+		logger.Info("exec crawl cron unix time:", time.Now().Unix())
 		err = crawler.StartBasicCrawlTask(fds)
 		if err != nil {
 			logger.Error("crawl err:", err)
 		}
 	})
-    cc.AddFunc("*/1 * * * *", func() {
-        logger.Info("check alive....run 1 min cron")
-    })
-    cc.Start()
+	_, _ = cc.AddFunc("*/1 * * * *", func() {
+		logger.Info("check alive....run 1 min cron")
+	})
+	cc.Start()
+	defer cc.Stop()
 
-    select{}
+	select {}
 }
