@@ -4,15 +4,15 @@ Type = "raw"
 [Spider]
 CsvPath = "./asset/urls.csv"
 ArticleBaseDir = "./data/"
-CrawlMaxSleep = 3600
+CrawlMaxSleep = 10
 RepeatDays = 7
-StartHour = 8
-StartMin = 7
+StartHour = 21
+StartMin = 30
 RecusiveMaxCount = 100
 
 [FaceBook]
-Account = "zaitsu.yuya@nlptech.com"
-Password = "lixiaodanlp"
+Account = "18801090613"
+Password = "I7*FUZd5"
 
 [Redis]
 Address = "127.0.0.1:6379"
