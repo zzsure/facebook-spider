@@ -4,7 +4,7 @@ Type = "raw"
 [Spider]
 CsvPath = "./asset/urls.csv"
 ArticleBaseDir = "./data/"
-CrawlInterval = 3600
+CrawlMaxSleep = 3600
 RepeatDays = 7
 StartHour = 8
 StartMin = 7
