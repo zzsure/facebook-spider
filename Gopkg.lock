@@ -66,6 +66,22 @@
   version = "v1.1.0"
 
 [[projects]]
+  digest = "1:b46f50677ef33284ebde2b285a42b707ff9e1de1f37328d91869859c929ebbd2"
+  name = "github.com/go-redis/redis"
+  packages = [
+    ".",
+    "internal",
+    "internal/consistenthash",
+    "internal/hashtag",
+    "internal/pool",
+    "internal/proto",
+    "internal/util",
+  ]
+  pruneopts = "UT"
+  revision = "7f69d5e32072d151eb6936cbe2306413e8117488"
+  version = "v6.15.6"
+
+[[projects]]
   digest = "1:9ae31ce33b4bab257668963e844d98765b44160be4ee98cafc44637a213e530d"
   name = "github.com/gobwas/glob"
   packages = [
@@ -104,28 +120,20 @@
   version = "v1.2.0"
 
 [[projects]]
+  branch = "master"
+  digest = "1:37314eefec30ecac46ac8eb2075d72b6eeb6720c0879e7a0e2da2ee9fe05ba8d"
+  name = "github.com/gocolly/redisstorage"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "1745c5e6d0ba07addaa789d754883ac20944b3e4"
+
+[[projects]]
   digest = "1:573ca21d3669500ff845bdebee890eb7fc7f0f50c59f2132f2a0c6b03d85086a"
   name = "github.com/golang/protobuf"
   packages = ["proto"]
   pruneopts = "UT"
   revision = "6c65a5562fc06764971b7c5d05c76c75e84bdbf7"
   version = "v1.3.2"
-
-[[projects]]
-  branch = "master"
-  digest = "1:9c37e3c7a2dc5e5ec5748c0955ef9bf48bf2a02e81454164ba431c6fce9cb004"
-  name = "github.com/juju/go4"
-  packages = ["lock"]
-  pruneopts = "UT"
-  revision = "40d72ab9641a2a8c36a9c46a51e28367115c8e59"
-
-[[projects]]
-  branch = "master"
-  digest = "1:ec47318deb07f90d03962e41cdfb41cc0ab82a112418ad205b50d03e75724e19"
-  name = "github.com/juju/persistent-cookiejar"
-  packages = ["."]
-  pruneopts = "UT"
-  revision = "d5e5a8405ef9633c84af42fbcc734ec8dd73c198"
 
 [[projects]]
   digest = "1:e30ac47ee84d7d354e0a284cf742e3015400667e90aa3d6ae99c7a55da67c645"
@@ -150,6 +158,14 @@
   packages = ["."]
   pruneopts = "UT"
   revision = "970db520ece77730c7e4724c61121037378659d9"
+
+[[projects]]
+  digest = "1:b778880d47d8544b11cd82b0d9731f9669d653489b400d0b5899b8a20934e7b4"
+  name = "github.com/robfig/cron"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "45fbe1491cdd47d74d1bf1396286d67faee8b8b5"
+  version = "v3.0.0"
 
 [[projects]]
   branch = "master"
@@ -177,25 +193,21 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:9f2f9da585ff4adaa5c72bfb2b120a7bfcbd6827f12a50d36b01b8ca7a0a96cc"
+  digest = "1:782acaf5c8fdbc4df11fea2bc43cdec74e6fa069df93d3cae9676a5f75f467f7"
   name = "golang.org/x/net"
   packages = [
     "context",
     "html",
     "html/atom",
     "html/charset",
-    "idna",
-    "publicsuffix",
   ]
   pruneopts = "UT"
   revision = "ec77196f6094c3492a8b61f2c11cf937f78992ae"
 
 [[projects]]
-  digest = "1:28deae5fe892797ff37a317b5bcda96d11d1c90dadd89f1337651df3bc4c586e"
+  digest = "1:8a0baffd5559acaa560f854d7d525c02f4fec2d4f8a214398556fb661a10f6e0"
   name = "golang.org/x/text"
   packages = [
-    "collate",
-    "collate/build",
     "encoding",
     "encoding/charmap",
     "encoding/htmlindex",
@@ -206,22 +218,15 @@
     "encoding/simplifiedchinese",
     "encoding/traditionalchinese",
     "encoding/unicode",
-    "internal/colltab",
     "internal/gen",
     "internal/language",
     "internal/language/compact",
     "internal/tag",
-    "internal/triegen",
-    "internal/ucd",
     "internal/utf8internal",
     "language",
     "runes",
-    "secure/bidirule",
     "transform",
-    "unicode/bidi",
     "unicode/cldr",
-    "unicode/norm",
-    "unicode/rangetable",
   ]
   pruneopts = "UT"
   revision = "342b2e1fbaa52c93f31447ad2c6abc048c63e475"
@@ -244,22 +249,6 @@
   version = "v1.6.5"
 
 [[projects]]
-  digest = "1:0f38fed0b27bfd46edbea0b23f7829e1640cad7fc6c6eed8b64858f335004dab"
-  name = "gopkg.in/errgo.v1"
-  packages = ["."]
-  pruneopts = "UT"
-  revision = "08dc5b27f5ced65786776ec936b4298445ec70cf"
-  version = "v1.0.1"
-
-[[projects]]
-  digest = "1:d814dd914c57c4e9f20039494471e2100e1746aa9543023ba852b17778936d9b"
-  name = "gopkg.in/retry.v1"
-  packages = ["."]
-  pruneopts = "UT"
-  revision = "cd7d3b308163f575bf3e14623edd50ef2b90b877"
-  version = "v1.0.3"
-
-[[projects]]
   digest = "1:4d2e5a73dc1500038e504a8d78b986630e3626dc027bc030ba5c75da257cdb96"
   name = "gopkg.in/yaml.v2"
   packages = ["."]
@@ -275,9 +264,10 @@
     "github.com/gocarina/gocsv",
     "github.com/gocolly/colly",
     "github.com/gocolly/colly/extensions",
-    "github.com/juju/persistent-cookiejar",
+    "github.com/gocolly/redisstorage",
     "github.com/koding/multiconfig",
     "github.com/op/go-logging",
+    "github.com/robfig/cron",
     "github.com/urfave/cli",
   ]
   solver-name = "gps-cdcl"

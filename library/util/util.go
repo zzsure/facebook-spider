@@ -5,16 +5,20 @@ import (
 	"errors"
 	"fmt"
 	"github.com/gocarina/gocsv"
+	"github.com/op/go-logging"
 	"gitlab.azbit.cn/web/facebook-spider/consts"
 	"gitlab.azbit.cn/web/facebook-spider/models"
 	"io/ioutil"
 	"net/http"
 	"os"
 	"path"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
 )
+
+var logger = logging.MustGetLogger("library/util")
 
 // json pretty print
 func PrettyPrint(v interface{}) (err error) {
@@ -109,10 +113,10 @@ func GetCurrentHour() int {
 }
 
 // get interval date
-func GetYesterdayDate() string {
+func GetOffsetDateStr(offset int) string {
 	loc, _ := time.LoadLocation(consts.TIME_ZONE)
 	nTime := time.Now().In(loc)
-	yesTime := nTime.AddDate(0, 0, -1)
+	yesTime := nTime.AddDate(0, 0, offset)
 	return yesTime.Format("20060102")
 }
 
@@ -166,47 +170,169 @@ func GetPostFileName(d string) string {
 }
 
 // get comment file name
-func GetCommentsFileName(d string) string {
+func GetCommentFileName(d string) string {
 	return fmt.Sprintf("%s%s", consts.COMMENT_FILE_PREFIX, d)
 }
 
-// get post dir
-func GetPostsDir(dir, url string) (string, error) {
+// get article dir
+func GetArticleDir(dir, lang, url string) (string, error) {
 	//dir := strings.TrimRight(conf.Config.Spider.ArticleBaseDir, "/")
 	name, err := GetOfficialAccountName(url)
 	if err != nil {
 		return "", err
 	}
-	return path.Join(dir, name), nil
+	return path.Join(dir, lang, name), nil
 	//return fmt.Sprintf("%s%s/%s%s", dir, url, util.GetCurrentDate(), "posts")
 }
 
 // get date by facebook cell time
 func GetDateByCellTime(cellTime string) string {
-	// 1 sec - 59 secs, 1 min - 59 mins, 1 hr - 23 hrs, Yesterday at 12:28 PM, October 29 at 11:33 PM
+	// 1 sec - 59 secs, 1 min - 59 mins, 1 hr - 23 hrs
+	// Sunday at 4:40 AM -> 20191112
 	date := GetCurrentDate()
+	cellTime = strings.Replace(cellTime, "小时", "hrs", -1)
+	cellTime = strings.Replace(cellTime, "分钟", "mins", -1)
+	loc, _ := time.LoadLocation(consts.TIME_ZONE)
 
-	if strings.Contains(cellTime, "Yesterday") {
-		date = GetYesterdayDate()
-	} else if strings.Contains(cellTime, "at") {
-		loc, _ := time.LoadLocation(consts.TIME_ZONE)
-		tmp := GetCurrentYear() + " " + cellTime
-		t, err := time.ParseInLocation("2006 January 2 at 3:4 PM", tmp, loc)
-		if err == nil {
-			date = fmt.Sprintf("%v", t.In(loc).Format("20060102"))
+	if strings.Contains(cellTime, "Today") {
+		// Today at 3:22 AM
+		date = GetCurrentDate()
+	} else if strings.Contains(cellTime, "Yesterday") {
+		// Yesterday at 12:28 PM
+		date = GetOffsetDateStr(-1)
+	} else if strings.Contains(cellTime, ",") {
+		if strings.Contains(cellTime, "at") {
+			// December 8, 2017 at 6:59 PM
+			t, err := time.ParseInLocation("January 2, 2006 at 3:4 PM", cellTime, loc)
+			if err == nil {
+				date = fmt.Sprintf("%v", t.In(loc).Format("20060102"))
+			} else {
+				logger.Error("parse time err:", err.Error())
+			}
 		} else {
-			fmt.Println("parse time err:", err.Error())
+			// May 16, 2018
+			t, err := time.ParseInLocation("Jan 2, 2006", cellTime, loc)
+			if err == nil {
+				date = fmt.Sprintf("%v", t.In(loc).Format("20060102"))
+			} else {
+				logger.Error("parse time err:", err.Error())
+			}
 		}
-	} else if strings.Contains(cellTime, " hrs") {
+	} else if strings.Contains(cellTime, "at") {
+		// October 29 at 11:33 PM
+		layout := "2006 January 2 at 3:4 PM"
+		if cellTime[3:4] == " " {
+			// Oct 29 at 11:33 PM
+			layout = "2006 Jan 2 at 3:4 PM"
+		}
+		if IsWeekFormat(cellTime) {
+			// Monday at 9:25 AM
+			arr := strings.Split(cellTime, " ")
+			if len(arr) > 0 {
+				offset := GetOffsetByToday(arr[0])
+				date = GetOffsetDateStr(-1 * offset)
+			}
+		} else {
+			tmp := GetCurrentYear() + " " + cellTime
+			t, err := time.ParseInLocation(layout, tmp, loc)
+			if err == nil {
+				date = fmt.Sprintf("%v", t.In(loc).Format("20060102"))
+			} else {
+				fmt.Println("parse time err:", err.Error())
+			}
+		}
+	} else if strings.Contains(cellTime, " hr") || strings.Contains(cellTime, " sec") || strings.Contains(cellTime, "min") {
+		// 1 sec - 59 secs, 1 min - 59 mins, 1 hr - 23 hrs
 		ch := GetCurrentHour()
 		arr := strings.Split(cellTime, " hrs")
 		if len(arr) >= 1 {
 			ph, err := strconv.Atoi(arr[0])
 			if err == nil && ph > ch {
-				date = GetYesterdayDate()
+				date = GetOffsetDateStr(-1)
 			}
+		}
+	} else if len(cellTime) == 5 || len(cellTime) == 6 {
+		// Aug 7
+		tmp := cellTime + ", " + GetCurrentYear()
+		t, err := time.ParseInLocation("Jan 2, 2006", tmp, loc)
+		if err == nil {
+			date = fmt.Sprintf("%v", t.In(loc).Format("20060102"))
+		} else {
+			logger.Error("parse time err:", err.Error())
 		}
 	}
 
 	return date
+}
+
+// Is string contain number
+func IsContainNumber(s string) bool {
+	pattern := "\\d+"
+	ret, _ := regexp.MatchString(pattern, s)
+	return ret
+}
+
+func IsAllNumber(s string) bool {
+	_, err := strconv.Atoi(s)
+	if err != nil {
+		return false
+	}
+	return true
+}
+
+func GetCurrDay() string {
+	loc, _ := time.LoadLocation(consts.TIME_ZONE)
+	nTime := time.Now().In(loc)
+	return nTime.Weekday().String()
+}
+
+func IsWeekFormat(s string) bool {
+	a := strings.Split(s, " ")
+	if len(a) <= 0 {
+		return false
+	}
+	var longDayNames = []string{
+		"Sunday",
+		"Monday",
+		"Tuesday",
+		"Wednesday",
+		"Thursday",
+		"Friday",
+		"Saturday",
+	}
+	for _, day := range longDayNames {
+		if a[0] == day {
+			return true
+		}
+	}
+	return false
+}
+
+// s2-s1
+func GetOffsetByToday(s1 string) int {
+	s2 := GetCurrDay()
+	var longDayNames = []string{
+		"Sunday",
+		"Monday",
+		"Tuesday",
+		"Wednesday",
+		"Thursday",
+		"Friday",
+		"Saturday",
+	}
+	s1Index := 0
+	s2Index := 0
+	for idx, day := range longDayNames {
+		if day == s1 {
+			s1Index = idx
+		}
+		if day == s2 {
+			s2Index = idx
+		}
+	}
+	idx := s2Index - s1Index
+	if idx < 0 {
+		idx += 7
+	}
+	return idx
 }

@@ -2,10 +2,21 @@
 Type = "raw"
 
 [Spider]
-CsvPath = "./data/urls.csv"
+CsvPath = "./asset/urls.csv"
 ArticleBaseDir = "./data/"
-CrawlInterval = 3600
+CrawlMaxSleep = 10
+RepeatDays = 7
+StartHour = 21
+StartMin = 30
+RecusiveMaxCount = 100
 
 [FaceBook]
-Account = "18810572605"
-Password = "4ocjR&SN"
+Account = "18801090613"
+Password = "I7*FUZd5"
+
+[Redis]
+Address = "127.0.0.1:6379"
+#Address = "172.20.10.237:16148"
+Password = ""
+DB = 3
+Prefix = "fb"

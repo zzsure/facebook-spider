@@ -9,6 +9,7 @@ import (
 	"github.com/op/go-logging"
 	"gitlab.azbit.cn/web/facebook-spider/conf"
 	"gitlab.azbit.cn/web/facebook-spider/consts"
+	"gitlab.azbit.cn/web/facebook-spider/library/storage"
 	"gitlab.azbit.cn/web/facebook-spider/library/util"
 	"gitlab.azbit.cn/web/facebook-spider/models"
 	"math/rand"
@@ -18,103 +19,403 @@ import (
 
 var logger = logging.MustGetLogger("modules/crawler")
 
-func Init() {
-	c := colly.NewCollector()
-	c.OnRequest(func(r *colly.Request) {
-	})
-	//_ = c.Visit(consts.LOGIN_CHECK_URL)
-}
-
 // a cron task
 func StartBasicCrawlTask(fds []*models.FileData) error {
+	if len(fds) <= 0 {
+		return errors.New("file data list length should not 0")
+	}
+
+	var err error
 	if !isLogin() {
-		err := login()
+		err = login(consts.LOGIN_CHECK_URL)
+	} else {
+		url := util.GetMobilePostURL(fds[0].URL)
+		logger.Info("visit url", url)
+		content, err := crawlByColly(url)
 		if err != nil {
 			return err
 		}
+
+		doc, err := goquery.NewDocumentFromReader(strings.NewReader(string(content)))
+		if err != nil {
+			return err
+		}
+		doc.Find("div a").Each(func(i int, s *goquery.Selection) {
+			if strings.Contains(s.Text(), "Log In") || strings.Contains(s.Text(), "登录") {
+				loginURL, exits := s.Attr("href")
+				if !exits || loginURL == "" {
+					loginURL = consts.LOGIN_CHECK_URL
+				}
+				err = login(loginURL)
+			}
+		})
+	}
+	if err != nil {
+		return err
 	}
 
 	for _, fd := range fds {
 		url := util.GetMobilePostURL(fd.URL)
 		logger.Info("crawl url:", url, " begin")
 
-		_, err := crawlByColly(url)
+		content, err := crawlByColly(url)
 		if err != nil {
 			return err
 		}
 
-		//logger.Info("url:", url, ", content:", string(content))
+		// crawl valid date post
+		pds, err := recursiveCrawlPost(content, 0)
+		if err != nil {
+			logger.Error("crawl url: ", fd.URL, ", err:", err)
+			continue
+		}
+		// save post data to file
+		err = savePostDataToFile(pds, fd)
+		if err != nil {
+			logger.Error("save url:", fd.URL, ", post data err:", err)
+		}
 
-		break
+		// get all post's comments
+		cds, err := getPostComments(pds)
+		if err != nil {
+			logger.Error("crawl url: ", fd.URL, ", err:", err)
+			continue
+		}
+		err = saveCommentDataToFile(cds, fd)
+		if err != nil {
+			logger.Error("save url:", fd.URL, ", comment data err:", err)
+		}
 	}
 	return nil
 }
 
-// a cron tas
-func StartCrawlTask(fds []*models.FileData) {
-	// TODO: add a cron
-	for _, fd := range fds {
-		//err := crawl(fd.URL, fd.Lang)
-		url, err := util.GetOfficialAccountPostURL(fd.URL)
-		if err != nil {
-			logger.Error("parse url err:", err)
-			continue
-		}
-
-		// crawl data to ads
-		logger.Info("crawl url:", url, " begin")
-		ads, err := crawlByGoquery(url, "en")
-		//ads, err := crawlByColly(url, "en")
-
-		if err != nil {
-			logger.Error("crawl url:", url, " err:", err)
-			continue
-		}
-		logger.Info("crawl url:", url, " end")
-
-		// save article data to file
-		err = saveArticleDataToFile(ads, fd.URL)
-		if err != nil {
-			logger.Error("save article data err:", err)
-		}
-
-		rs := rand.Intn(consts.MAX_SLEEP_TIME)
-		logger.Info("random sleep seconds:", rs)
-		time.Sleep(time.Duration(rs) * time.Second)
-		break
-	}
+func crawlSleep() {
+	rs := rand.Intn(conf.Config.Spider.CrawlMaxSleep)
+	logger.Info("random post sleep seconds:", rs)
+	time.Sleep(time.Duration(rs) * time.Second)
 }
 
-// save article data to file
-func saveArticleDataToFile(ads []*models.ArticleData, url string) error {
-	// get all posts and comments
-	pm := make(map[string]string)
-	cm := make(map[string]string)
+func getPostComments(pds []*models.PostData) ([]*models.CommentData, error) {
+	var acds []*models.CommentData
+	for _, pd := range pds {
+		if pd.CommentURL != "" {
+			html, err := crawlByColly(pd.CommentURL)
+			if err != nil {
+				logger.Error("craw comment url: ", pd.CommentURL, ", err: ", err)
+				continue
+			}
+			// TODO: for test, change recursive crawl
+			//html, _ := util.ReadStringFromFile("./data/comment.html")
+			cds, err := recursiveCrawlComments([]byte(html), 0)
+			if err != nil {
+				logger.Error("recursive crawl comment err:", err)
+				continue
+			}
+			acds = append(acds, cds...)
+		}
+	}
+	return acds, nil
+}
 
-	for _, ad := range ads {
-		if _, ok := pm[ad.Date]; ok {
-			pm[ad.Date] += "\n"
+func recursiveCrawlComments(content []byte, depth int) ([]*models.CommentData, error) {
+	cds, moreURL, err := parseComment(content)
+	if err != nil {
+		return nil, err
+	}
+	if len(cds) <= 0 {
+		return nil, errors.New("not have comments")
+	}
+
+	validDate := util.GetOffsetDateStr(-1 * conf.Config.Spider.RepeatDays)
+	if cds[len(cds)-1].Date < validDate || depth > conf.Config.Spider.RecusiveMaxCount {
+		return cds, nil
+	}
+
+	if moreURL != "" {
+		content, err := crawlByColly(moreURL)
+		if err != nil {
+			logger.Error("crawl comment more url: ", moreURL, ", err: ", err)
 		}
-		if ad.Posts != "" {
-			pm[ad.Date] += ad.Posts
-		}
-		if len(ad.Comments) > 0 {
-			cm[ad.Date] += strings.Join(ad.Comments, "\n")
+		rcds, err := recursiveCrawlComments(content, depth+1)
+		if err == nil {
+			cds = append(cds, rcds...)
 		}
 	}
 
-	if len(pm) == 0 && len(cm) == 0 {
+	return cds, nil
+}
+
+func recursiveCrawlPost(content []byte, depth int) ([]*models.PostData, error) {
+	pds, moreURL, err := parsePost(content)
+	logger.Info("more url:", string(moreURL))
+	if err != nil {
+		return nil, err
+	}
+	if len(pds) <= 0 {
+		return nil, errors.New("not have posts")
+	}
+
+	validDate := util.GetOffsetDateStr(-1 * conf.Config.Spider.RepeatDays)
+	if pds[len(pds)-1].Date < validDate || depth > conf.Config.Spider.RecusiveMaxCount {
+		return pds, nil
+	}
+
+	if moreURL != "" {
+		content, err := crawlByColly(moreURL)
+		if err != nil {
+			logger.Error("crawl post more url: ", moreURL, ", err: ", err)
+			return pds, nil
+		}
+		rpds, err := recursiveCrawlPost(content, depth+1)
+		if err == nil {
+			pds = append(pds, rpds...)
+		}
+	}
+
+	return pds, nil
+}
+
+func recursiveCrawlReply(content []byte, depth int) ([]*models.CommentData, error) {
+	cds, moreURL, err := parseReply(content)
+	if err != nil {
+		return nil, err
+	}
+	if len(cds) <= 0 {
+		return nil, errors.New("not have reply")
+	}
+
+	validDate := util.GetOffsetDateStr(-1 * conf.Config.Spider.RepeatDays)
+	if cds[len(cds)-1].Date < validDate || depth > conf.Config.Spider.RecusiveMaxCount {
+		return cds, nil
+	}
+
+	if moreURL != "" {
+		content, err := crawlByColly(moreURL)
+		if err != nil {
+			logger.Error("crawl reply more url: ", moreURL, ", err: ", err)
+		}
+		rcds, err := recursiveCrawlReply(content, depth+1)
+		if err == nil {
+			cds = append(cds, rcds...)
+		}
+	}
+
+	return cds, nil
+}
+
+func parsePost(b []byte) ([]*models.PostData, string, error) {
+	var rets []*models.PostData
+	var moreURL string
+
+	doc, err := goquery.NewDocumentFromReader(strings.NewReader(string(b)))
+	if err != nil {
+		return nil, "", err
+	}
+
+	doc.Find("div[role=article]").Each(func(i int, s *goquery.Selection) {
+		post := ""
+		s.Find("span p").Each(func(i int, s *goquery.Selection) {
+			post += strings.TrimLeft(s.Text(), " ") + "\n"
+		})
+
+		logger.Info("post is: ", post)
+
+		cellTime := s.Find("abbr").Text()
+		logger.Info("time string is: ", cellTime)
+		date := util.GetDateByCellTime(cellTime)
+		logger.Info("date string is: ", date)
+
+		var commentURL string
+		s.Find("a").Each(func(i int, s *goquery.Selection) {
+			if strings.Contains(s.Text(), "Comment") || strings.Contains(s.Text(), "评论") {
+				if util.IsContainNumber(s.Text()) {
+					commentURL, _ = s.Attr("href")
+					if commentURL != "" {
+						commentURL = fmt.Sprintf("%s%s", strings.TrimRight(consts.BASIC_HTTPS_FACEBOOK_DOMAIN, "/"), commentURL)
+					}
+				}
+				return
+			}
+		})
+		logger.Info("comment url: ", commentURL)
+		logger.Info("\n")
+
+		ad := &models.PostData{
+			Date:       date,
+			Post:       post,
+			CommentURL: commentURL,
+		}
+		rets = append(rets, ad)
+	})
+
+	doc.Find("div a").Each(func(i int, s *goquery.Selection) {
+		if strings.Contains(s.Text(), "Show more") || strings.Contains(s.Text(), "更多") {
+			moreURL, _ = s.Attr("href")
+			if moreURL != "" {
+				moreURL = fmt.Sprintf("%s%s", strings.TrimRight(consts.BASIC_HTTPS_FACEBOOK_DOMAIN, "/"), moreURL)
+			}
+			return
+		}
+	})
+	return rets, moreURL, nil
+}
+
+func parseComment(b []byte) ([]*models.CommentData, string, error) {
+	doc, err := goquery.NewDocumentFromReader(strings.NewReader(string(b)))
+	if err != nil {
+		return nil, "", err
+	}
+
+	var cds []*models.CommentData
+	doc.Find("h3").Each(func(i int, s *goquery.Selection) {
+		ppDiv := s.Parent().Parent()
+		ppID, exits := ppDiv.Attr("id")
+		if exits && util.IsAllNumber(ppID) {
+			div := s.Next()
+			comment := div.Text()
+			logger.Info("comment: ", comment)
+			if comment != "" {
+				abbr := div.Parent().Find("abbr")
+				timeStr := abbr.Text()
+				logger.Info("time str: ", timeStr)
+				date := util.GetDateByCellTime(timeStr)
+				logger.Info("date: ", date)
+				cd := &models.CommentData{
+					Date:    date,
+					Comment: comment,
+				}
+				cds = append(cds, cd)
+				logger.Info("\n")
+			}
+		}
+		ppDiv.Find("div").Each(func(i int, s *goquery.Selection) {
+			replyDiv, exits := s.Attr("id")
+			if exits && strings.Contains(replyDiv, "comment_replies") {
+				replyURL, exists := s.Find("a").Attr("href")
+				if exists && replyURL != "" {
+					replyURL := fmt.Sprintf("%s%s", strings.TrimRight(consts.BASIC_HTTPS_FACEBOOK_DOMAIN, "/"), replyURL)
+					content, err := crawlByColly(replyURL)
+					if err == nil {
+						rcds, err := recursiveCrawlReply(content, 0)
+						if err == nil {
+							cds = append(cds, rcds...)
+						}
+					}
+				}
+			}
+		})
+	})
+
+	var moreURL string
+	moreA := doc.Find("div a")
+	if moreA.Find("img").Text() != "" {
+		moreURL, exits := moreA.Attr("href")
+		if exits && moreURL != "" {
+			moreURL = fmt.Sprintf("%s%s", strings.TrimRight(consts.BASIC_HTTPS_FACEBOOK_DOMAIN, "/"), moreURL)
+		}
+	}
+	return cds, moreURL, nil
+}
+
+func parseReply(b []byte) ([]*models.CommentData, string, error) {
+	doc, err := goquery.NewDocumentFromReader(strings.NewReader(string(b)))
+	if err != nil {
+		return nil, "", err
+	}
+
+	var cds []*models.CommentData
+	doc.Find("h3").Each(func(i int, s *goquery.Selection) {
+		ppDiv := s.Parent().Parent()
+		ppID, exits := ppDiv.Attr("id")
+		if exits && util.IsAllNumber(ppID) {
+			div := s.Next()
+			comment := div.Text()
+			logger.Info("comment: ", comment)
+			if comment != "" {
+				abbr := div.Parent().Find("abbr")
+				timeStr := abbr.Text()
+				logger.Info("time str: ", timeStr)
+				date := util.GetDateByCellTime(timeStr)
+				logger.Info("date: ", date)
+				cd := &models.CommentData{
+					Date:    date,
+					Comment: comment,
+				}
+				cds = append(cds, cd)
+				logger.Info("\n")
+			}
+		}
+	})
+	var moreURL string
+	moreA := doc.Find("div a")
+	moreURL, exits := moreA.Attr("href")
+	if exits && moreURL != "" {
+		moreURL = fmt.Sprintf("%s%s", strings.TrimRight(consts.BASIC_HTTPS_FACEBOOK_DOMAIN, "/"), moreURL)
+	}
+	return cds, moreURL, nil
+}
+
+// save comment data to file
+func saveCommentDataToFile(cds []*models.CommentData, fd *models.FileData) error {
+	cm := make(map[string]string)
+
+	for _, cd := range cds {
+		if _, ok := cm[cd.Date]; ok {
+			cm[cd.Date] += "\n"
+		}
+		if cd.Comment != "" {
+			cm[cd.Date] += cd.Comment + "\n"
+		}
+	}
+
+	if len(cm) == 0 {
 		logger.Info("len pm and cm is 0")
 		return nil
 	}
 
-	postsDir, err := util.GetPostsDir(conf.Config.Spider.ArticleBaseDir, url)
+	articleDir, err := util.GetArticleDir(conf.Config.Spider.ArticleBaseDir, fd.Lang, fd.URL)
+	if err != nil {
+		logger.Error("get comments path err:", err)
+		return err
+	}
+
+	// save comment data to file
+	for k, v := range cm {
+		err = util.SaveStringToFile(articleDir, util.GetCommentFileName(k), v)
+		if err != nil {
+			logger.Error("save ", k, " comment err:", err)
+			continue
+		}
+	}
+
+	return nil
+}
+
+// save article data to file
+func savePostDataToFile(pds []*models.PostData, fd *models.FileData) error {
+	pm := make(map[string]string)
+
+	for _, pd := range pds {
+		if _, ok := pm[pd.Date]; ok {
+			pm[pd.Date] += "\n"
+		}
+		if pd.Post != "" {
+			pm[pd.Date] += pd.Post
+		}
+	}
+
+	if len(pm) == 0 {
+		logger.Info("len pm and cm is 0")
+		return nil
+	}
+
+	postsDir, err := util.GetArticleDir(conf.Config.Spider.ArticleBaseDir, fd.Lang, fd.URL)
 	if err != nil {
 		logger.Error("get posts path err:", err)
 		return err
 	}
 
-	// save posts data to file
+	// save post data to file
 	for k, v := range pm {
 		err = util.SaveStringToFile(postsDir, util.GetPostFileName(k), v)
 		if err != nil {
@@ -123,79 +424,22 @@ func saveArticleDataToFile(ads []*models.ArticleData, url string) error {
 		}
 	}
 
-	// save comments data to file
-	for k, v := range cm {
-		err = util.SaveStringToFile(postsDir, util.GetCommentsFileName(k), v)
-		if err != nil {
-			logger.Error("save ", k, " comments err:", err)
-			continue
-		}
-	}
-
 	return nil
-}
-
-// craw data by goquery
-func crawlByGoquery(url, lang string) ([]*models.ArticleData, error) {
-	// request url get response
-	b, err := util.RequestUrl(url)
-	if err != nil {
-		return nil, err
-	}
-	// Load the HTML document
-	doc, err := goquery.NewDocumentFromReader(strings.NewReader(string(b)))
-	if err != nil {
-		logger.Error("document reader error:", err)
-	}
-
-	// TODO: for test
-	//html, _ := util.ReadStringFromFile("./data/res_20191030.html")
-	//doc, err := goquery.NewDocumentFromReader(strings.NewReader(html))
-	//if err != nil {
-	//	logger.Error("document reader error:", err)
-	//}
-
-	var rets []*models.ArticleData
-	// Find the review items
-	doc.Find(".userContentWrapper").Each(func(i int, s *goquery.Selection) {
-		posts := ""
-		s.Find("p").Each(func(i int, s *goquery.Selection) {
-			posts += strings.TrimLeft(s.Text(), " ") + "\n"
-		})
-		logger.Info("idx: ", i, "ret: ", posts)
-
-		cellTime := s.Find(".timestampContent").Text()
-		logger.Info("time string is:", cellTime)
-		date := util.GetDateByCellTime(cellTime)
-		logger.Info("date string is:", date)
-
-		var comments []string
-		ad := &models.ArticleData{
-			Date:     date,
-			Posts:    posts,
-			Comments: comments,
-		}
-		rets = append(rets, ad)
-	})
-	//doc.Find(".sidebar-reviews article .content-block").Each(func(i int, s *goquery.Selection) {
-	//	// For each item found, get the band and title
-	//	band := s.Find("a").Text()
-	//	title := s.Find("i").Text()
-	//	fmt.Printf("Review %d: %s - %s\n", i, band, title)
-	//	ret = title
-	//})
-	return rets, nil
 }
 
 // crawl by colly
 func crawlByColly(url string) ([]byte, error) {
+	crawlSleep()
+
 	c := colly.NewCollector()
+	_ = c.SetStorage(storage.StorageIns)
+	c.AllowURLRevisit = true
 	extensions.RandomUserAgent(c)
 	extensions.Referer(c)
 	c.OnRequest(func(r *colly.Request) {
 		r.Headers.Set("Host", "facebook.com")
 		r.Headers.Set("Connection", "keep-alive")
-		r.Headers.Set("Accept-Language", "en-US,en;q=0.8")
+		r.Headers.Set("Accept-Language", "en-US,en;q=0.9")
 		r.ResponseCharacterEncoding = "utf-8"
 	})
 
@@ -204,6 +448,7 @@ func crawlByColly(url string) ([]byte, error) {
 
 	c.OnResponse(func(resp *colly.Response) {
 		content = resp.Body
+		_ = util.SaveStringToFile(conf.Config.Spider.ArticleBaseDir, "crawl.html", string(content))
 		//logger.Info("crawl:", string(resp.Body))
 	})
 
@@ -222,7 +467,16 @@ func crawlByColly(url string) ([]byte, error) {
 // check login
 func isLogin() bool {
 	c := colly.NewCollector()
+	_ = c.SetStorage(storage.StorageIns)
+	c.AllowURLRevisit = true
+	c.OnRequest(func(r *colly.Request) {
+		r.Headers.Set("Host", "facebook.com")
+		r.Headers.Set("Connection", "keep-alive")
+		r.Headers.Set("Accept-Language", "en-US,en;q=0.9")
+		r.ResponseCharacterEncoding = "utf-8"
+	})
 	for _, cookie := range c.Cookies(consts.LOGIN_CHECK_URL) {
+		logger.Info("cookie:", cookie.String())
 		if strings.Contains(cookie.String(), "c_user") {
 			logger.Info("have login")
 			return true
@@ -233,14 +487,16 @@ func isLogin() bool {
 }
 
 // log in mbasic facebook
-func login() error {
+func login(url string) error {
 	c := colly.NewCollector()
+	_ = c.SetStorage(storage.StorageIns)
 	extensions.RandomUserAgent(c)
 	extensions.Referer(c)
+	c.AllowURLRevisit = true
 	c.OnRequest(func(r *colly.Request) {
 		r.Headers.Set("Host", "facebook.com")
 		r.Headers.Set("Connection", "keep-alive")
-		r.Headers.Set("Accept-Language", "en-US,en;q=0.8")
+		r.Headers.Set("Accept-Language", "en-US,en;q=0.9")
 		r.ResponseCharacterEncoding = "utf-8"
 	})
 
@@ -270,28 +526,41 @@ func login() error {
 
 	c.OnResponse(func(resp *colly.Response) {
 		logger.Info("login:", string(resp.Body))
-		// save cookies
-		/*cookies := c.Cookies(consts.LOGIN_CHECK_URL)
-		j, errCookie := cookiejar.New(&cookiejar.Options{Filename: "cookie.db"})
-		if errCookie == nil {
-			j.SetCookies(resp.Request.URL, cookies)
-			errCookie = j.Save()
-			if errCookie != nil {
-				logger.Error("save cookies err:", errCookie)
-			}
-		} else {
-			logger.Error("cookie new err:", errCookie)
-		}*/
 	})
 
 	c.OnError(func(resp *colly.Response, errHttp error) {
 		err = errHttp
 	})
 
-	errVisit := c.Visit(consts.LOGIN_CHECK_URL)
+	errVisit := c.Visit(url)
 	if errVisit != nil {
 		return errVisit
 	}
 
 	return err
+}
+
+// a cron task
+func StartBasicCrawlTaskTest(fds []*models.FileData) error {
+	// TODO: for test
+	html, _ := util.ReadStringFromFile("./data/vogue.html")
+	pds, moreURL, err := parsePost([]byte(html))
+	logger.Info("show more url: ", moreURL)
+
+	// save article data to file
+	err = savePostDataToFile(pds, fds[0])
+	if err != nil {
+		logger.Error("save article data err:", err)
+	}
+
+	cds, err := getPostComments(pds)
+	if err != nil {
+		logger.Error("crawl url: ", fds[0].URL, ", err:", err)
+	}
+	err = saveCommentDataToFile(cds, fds[0])
+	if err != nil {
+		logger.Error("save url:", fds[0].URL, ", comment data err:", err)
+	}
+
+	return nil
 }
